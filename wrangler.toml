@@ -19,6 +19,13 @@
 name = "stagewash"
 compatibility_date = "2026-08-02"
 
+# `custom_domain = true` makes Cloudflare create and manage the DNS record for
+# this hostname itself — the same shape as test-card and arraycad. Adding a
+# proxied CNAME by hand as well conflicts with it.
+[[routes]]
+pattern = "stagewash.stoatworks-labs.com"
+custom_domain = true
+
 [assets]
 directory = "./dist"
 not_found_handling = "single-page-application"
