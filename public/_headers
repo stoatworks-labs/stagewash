@@ -1,0 +1,14 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+
+# Hashed filenames, so these are safe to pin for a year.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Short and revalidated: a redeploy must be visible in minutes, not tomorrow.
+# See the fleet note about stale-while-revalidate serving the old copy on the
+# first load after expiry as well as before it.
+/index.html
+  Cache-Control: public, max-age=600, must-revalidate
