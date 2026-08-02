@@ -212,6 +212,14 @@ export function App(): React.ReactElement {
             Grid CSV
           </button>
         </div>
+
+        {/* Opens the shared About dialog — see public/about.js, which delegates
+            this attribute from the document, so nothing needs importing here. */}
+        <div className="toolbar-group">
+          <button type="button" data-stoatworks-about>
+            About
+          </button>
+        </div>
       </div>
 
       {openError && (
