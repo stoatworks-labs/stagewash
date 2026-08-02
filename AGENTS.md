@@ -220,6 +220,71 @@ they are** — they are correctly cited transcriptions, and replacing them with 
 numbers would embed ETC's photometric data in the shipped bundle, which is a
 redistribution question rather than a technical one. Import the file to get `measured`.
 
+## 6b. Solver performance
+
+`npm run bench` (`src/domain/__bench__/solver.bench.ts`). Benchmark the shapes a real
+design reaches, not the default rig — 18 fixtures on a small stage solves in a
+millisecond however badly it is written.
+
+Measured on this machine, before and after the optimisation pass:
+
+| case | before | after | |
+|---|---|---|---|
+| 18 analytic, small stage | 0.76 ms | 0.11 ms | 6.7× |
+| 120 narrow analytic, 20×12 m | 14.3 ms | 1.65 ms | 8.6× |
+| 120 wide analytic, 20×12 m | 40.4 ms | 5.4 ms | 7.5× |
+| 60 narrow analytic, 0.05 m grid | 110.7 ms | 9.7 ms | 11.4× |
+| 120 measured (tabulated) | 29.7 ms | 19.3 ms | 1.5× |
+| 60 measured, 0.05 m grid | 196.3 ms | 143.5 ms | 1.4× |
+
+Four changes, in the order they mattered:
+
+1. **The cutoff was a full angle where a half angle was wanted** (`estimator.ts`).
+   `cutoffGamma` is compared against gamma, which is measured *from* the axis, but it was
+   computed with the factor of 2 that turns a half angle into the full angle a datasheet
+   quotes. Every analytic beam was therefore culled at twice its angle — four times the
+   solid angle. Harmless to the numbers (it truncated at ~1e-19 of peak rather than the
+   intended 1e-3, i.e. barely at all) and quietly expensive.
+2. **Window culling** (`windowFor` in `solver.ts`). A fixture is *exactly* zero outside
+   its cutoff cone, so the cone's intersection with the sample plane bounds everything it
+   can touch and the rest of the grid is never visited. Conservative by construction: it
+   returns the whole grid whenever the cone does not close on the plane.
+3. **Uniform-angle direct indexing** (`withUniformSteps`). Real photometric files are
+   evenly spaced — ETC's are every 2° in both axes — which turns the interpolator's two
+   binary searches into two divides. Exact; falls back to searching when angles are not
+   uniform.
+4. **The cosine-space table** (`buildCosTable`). The solver already holds `cos gamma` as
+   a dot product and was spending `acos`, `pow` and `exp` per sample to turn it into an
+   intensity. All three become one table lookup. Sampling in cosine space rather than in
+   gamma is what makes it accurate: near the axis `I` is *linear* in `cos gamma`, which is
+   exactly where error would matter most. Symmetric analytic beams only.
+
+**The cosine table is the one place exactness is traded for speed.** `cosTable.test.ts`
+measures the trade rather than asserting it: better than 1e-5 of peak inside the beam,
+across every beam width, including the flat-topped n≈5 shape a Source Four fits. The only
+appreciable difference is at the cutoff, where the table smooths a step that exists solely
+because of the truncation — bounded by `CUTOFF_FRACTION` (1e-3 of peak, ~1 lux at 10 m
+from a 100,000 cd fixture), four orders of magnitude below the ±15% the source data
+disagrees with itself by.
+
+**Both `solve` and `illuminanceAtPoint` use the table.** They must, or the test comparing
+them cell by cell starts failing for a reason that is not a bug.
+
+### Where the remaining headroom is, and why it was left
+
+Tabulated fixtures. Stubbing the interpolation out takes the 0.05 m case from 143 ms to
+64 ms, so the interpolation is ~55% of it. Closing that means either inlining a third copy
+of the interpolation into the solver loop — the exact duplication §7 warns about, and
+there are already two copies to keep in step — or making `candela` a typed array, which
+breaks project save/load because that goes through `JSON.stringify`. Neither is worth it
+for a case that is 19 ms at normal resolution.
+
+**Culling correctness is not assumed.** `solver.test.ts` compares the solve against a
+brute-force reference that visits every cell, on the geometry where culling actually bites
+— narrow steep beams, long oblique ellipses, fixtures aimed off the stage, wide beams
+covering everything, both plane orientations, and a measured distribution. Shrinking the
+window padding makes those tests fail, which is how you know they are load-bearing.
+
 ## 7. Traps that already cost time
 
 - **A measured table's cutoff is its last *live* row, not its last measured row.**

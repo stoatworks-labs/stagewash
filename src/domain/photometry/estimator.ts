@@ -112,6 +112,17 @@ export const TYPICAL_BEAM_FIELD_RATIO: Record<FixtureKind, number> = {
   beam: 0.7, // no measured source
 };
 
+/**
+ * Fraction of peak intensity below which a synthesised beam is treated as dark.
+ *
+ * 0.1%. On a 100,000 cd fixture that is 100 cd, which is 1 lux at 10 m — three
+ * orders of magnitude below the levels this app deals in, and four below the
+ * ±15% spread between a manufacturer's own datasheet and their own IES file for
+ * the same fixture. Tightening it further buys nothing; loosening it starts to
+ * clip real spill.
+ */
+export const CUTOFF_FRACTION = 1e-3;
+
 export interface BeamShape {
   n: number;
   k: number;
@@ -216,12 +227,20 @@ export function estimatePhotometrics(input: EstimateInput): FixturePhotometrics 
   const k = Math.LN2 / Math.pow(beamAngle / 2, n);
   const kCross = Math.LN2 / Math.pow(beamCross / 2, n);
 
-  // Cut the beam off where it has fallen to 1% of peak. Real optics have a
-  // hard aperture and a super-Gaussian tail is already negligible by then;
-  // the cutoff exists so the solver can reject most fixtures for most points
-  // with one comparison.
+  // Cut the beam off where it has fallen to CUTOFF_FRACTION of peak. Real
+  // optics have a hard aperture and a super-Gaussian tail is long past
+  // negligible by then; the cutoff is what lets the solver bound the region a
+  // fixture can reach and skip the rest of the grid entirely.
+  //
+  // `cutoffGamma` is a **half** angle — it is compared against gamma, which is
+  // measured from the beam axis. An earlier version computed it with the
+  // factor of 2 that turns a half angle into the full angle a datasheet
+  // quotes, which made every beam's cull cone twice as wide and so four times
+  // the solid angle. Harmless to the numbers (it truncated at ~1e-19 of peak
+  // instead of 1e-3, i.e. it barely truncated at all) and quietly expensive:
+  // it is most of why a 120-fixture solve was doing work it could not use.
   const cutoffGamma = Math.min(
-    2 * Math.pow(Math.log(100) / Math.min(k, kCross), 1 / n),
+    Math.pow(Math.log(1 / CUTOFF_FRACTION) / Math.min(k, kCross), 1 / n),
     180,
   );
 

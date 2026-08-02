@@ -25,7 +25,7 @@
  */
 
 import { DEG, RAD } from './geometry';
-import { intensityAt } from './photometry/distribution';
+import { intensityAt, sampleCosTable } from './photometry/distribution';
 import type { PreparedFixture } from './rig';
 import type { Grid, MeasurementPlane, Stage } from './types';
 
@@ -86,6 +86,98 @@ export interface SolveOutput {
   elapsedMs: number;
 }
 
+/** Half-open row/column window of the grid a fixture can reach. */
+interface Window {
+  c0: number;
+  c1: number;
+  r0: number;
+  r1: number;
+}
+
+/**
+ * The window of the grid a fixture can possibly light.
+ *
+ * Beyond `maxGamma` a fixture emits **exactly** zero — that is what makes this
+ * safe rather than an approximation. So the cone of half-angle `maxGamma` about
+ * the beam axis, intersected with the sample plane, bounds everything the
+ * fixture can contribute to, and every cell outside it can be skipped without
+ * being visited at all.
+ *
+ * This is the difference between "cheap to reject" and "free to reject". A 16°
+ * spot on a 20 x 12 m stage touches a few percent of the grid; before this, the
+ * other 95%+ still cost three subtractions, a dot product, a square root and a
+ * divide each, per fixture.
+ *
+ * Returns the whole grid whenever the cone does not close on the plane — a
+ * fixture aimed at or above the horizon throws a hyperbola, not an ellipse, and
+ * there is no bounding box to be had. That is conservative, which is the only
+ * direction it is allowed to be wrong in.
+ */
+function windowFor(fixture: PreparedFixture, field: SampleField): Window {
+  const full: Window = { c0: 0, c1: field.cols - 1, r0: 0, r1: field.rows - 1 };
+
+  // Every sample sits on one horizontal plane, whatever the plane's
+  // orientation — `buildSampleField` only changes the normal — so one z serves.
+  const planeZ = field.points[2] as number;
+
+  // At 90° or beyond the cone is a half-space or worse; no useful bound.
+  if (!(fixture.maxGamma > 0) || fixture.maxGamma >= 89.9) return full;
+
+  const { forward, right, up } = fixture.frame;
+  const { x: px, y: py, z: pz } = fixture.position;
+  const tan = Math.tan(fixture.maxGamma * DEG);
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  // The bounded intersection of a cone and a plane is an ellipse, and every
+  // point of its boundary is where one rim ray lands, so sampling the rim
+  // densely bounds it.
+  const SEGMENTS = 96;
+  for (let i = 0; i < SEGMENTS; i++) {
+    const a = (i / SEGMENTS) * Math.PI * 2;
+    const ca = Math.cos(a) * tan;
+    const sa = Math.sin(a) * tan;
+
+    const dx = forward.x + right.x * ca + up.x * sa;
+    const dy = forward.y + right.y * ca + up.y * sa;
+    const dz = forward.z + right.z * ca + up.z * sa;
+
+    // This edge of the cone never comes down to the plane.
+    if (dz > -1e-6) return full;
+    const t = (planeZ - pz) / dz;
+    if (t <= 0) return full;
+
+    const x = px + dx * t;
+    const y = py + dy * t;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return full;
+
+  // Pad, for two reasons: the sampled rim is a polygon inscribed in the true
+  // ellipse and so slightly undersized, and the window is snapped outward to
+  // whole cells anyway. Two cells is far more than either needs and costs
+  // nothing measurable.
+  const pad = field.spacing * 2;
+  const c0 = Math.floor((minX - pad - field.originX) / field.spacing);
+  const c1 = Math.ceil((maxX + pad - field.originX) / field.spacing);
+  const r0 = Math.floor((minY - pad - field.originY) / field.spacing);
+  const r1 = Math.ceil((maxY + pad - field.originY) / field.spacing);
+
+  return {
+    c0: Math.max(0, c0),
+    c1: Math.min(field.cols - 1, c1),
+    r0: Math.max(0, r0),
+    r1: Math.min(field.rows - 1, r1),
+  };
+}
+
 /**
  * Accumulate every fixture into the grid.
  *
@@ -128,46 +220,66 @@ export function solve(
     // point outside the beam, which on a typical rig is most of them.
     const cosCutoff = Math.cos(Math.min(fixture.maxGamma, 180) * DEG);
     const symmetric = fixture.rotationallySymmetric;
+    const cosTable = fixture.cosTable;
 
     let fixtureSum = 0;
 
-    for (let i = 0, p = 0; i < count; i++, p += 3) {
-      const dx = (points[p] as number) - px;
-      const dy = (points[p + 1] as number) - py;
-      const dz = (points[p + 2] as number) - pz;
+    // Only the cells this fixture can reach. Everything outside is exactly
+    // zero and is never visited.
+    const { c0, c1, r0, r1 } = windowFor(fixture, field);
 
-      const d2 = dx * dx + dy * dy + dz * dz;
-      // A fixture sitting exactly on a sample point would divide by zero and
-      // paint one infinite cell, which then swamps every statistic on the page.
-      if (d2 < 1e-6) continue;
+    for (let row = r0; row <= r1; row++) {
+      const rowStart = row * field.cols;
+      for (let col = c0; col <= c1; col++) {
+        const i = rowStart + col;
+        const p = i * 3;
 
-      const d = Math.sqrt(d2);
-      const inv = 1 / d;
+        const dx = (points[p] as number) - px;
+        const dy = (points[p + 1] as number) - py;
+        const dz = (points[p + 2] as number) - pz;
 
-      // cos of the angle between the incoming ray and the surface normal.
-      // Negative means the light is arriving from behind the surface — a
-      // backlight cannot put anything on the front of a face.
-      const cosIncidence = -(dx * nx + dy * ny + dz * nz) * inv;
-      if (cosIncidence <= 0) continue;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        // A fixture sitting exactly on a sample point would divide by zero and
+        // paint one infinite cell, which then swamps every statistic on the
+        // page.
+        if (d2 < 1e-6) continue;
 
-      const cosGamma = (dx * fx + dy * fy + dz * fz) * inv;
-      if (cosGamma <= cosCutoff) continue;
+        const d = Math.sqrt(d2);
+        const inv = 1 / d;
 
-      const gamma = Math.acos(cosGamma > 1 ? 1 : cosGamma) * RAD;
+        // cos of the angle between the incoming ray and the surface normal.
+        // Negative means the light is arriving from behind the surface — a
+        // backlight cannot put anything on the front of a face.
+        const cosIncidence = -(dx * nx + dy * ny + dz * nz) * inv;
+        if (cosIncidence <= 0) continue;
 
-      let c = 0;
-      if (!symmetric) {
-        const alongRight = dx * rx + dy * ry + dz * rz;
-        const alongUp = dx * ux + dy * uy + dz * uz;
-        c = Math.atan2(alongUp, alongRight) * RAD;
-        if (c < 0) c += 360;
+        const cosGamma = (dx * fx + dy * fy + dz * fz) * inv;
+        if (cosGamma <= cosCutoff) continue;
+
+        let intensity: number;
+        if (cosTable) {
+          // One lookup instead of acos + pow + exp.
+          intensity = sampleCosTable(cosTable, cosGamma);
+        } else {
+          const gamma = Math.acos(cosGamma > 1 ? 1 : cosGamma) * RAD;
+          let c = 0;
+          if (!symmetric) {
+            const alongRight = dx * rx + dy * ry + dz * rz;
+            const alongUp = dx * ux + dy * uy + dz * uz;
+            c = Math.atan2(alongUp, alongRight) * RAD;
+            if (c < 0) c += 360;
+          }
+          intensity = intensityAt(photometry, c, gamma);
+        }
+
+        const contribution = (intensity * cosIncidence * gain) / d2;
+        lux[i] = (lux[i] as number) + contribution;
+        fixtureSum += contribution;
       }
-
-      const contribution = (intensityAt(photometry, c, gamma) * cosIncidence * gain) / d2;
-      lux[i] = (lux[i] as number) + contribution;
-      fixtureSum += contribution;
     }
 
+    // Averaged over the whole stage, not over the window — this is "what this
+    // fixture adds to the stage average", and the cells it misses count.
     perFixtureAvg[f] = fixtureSum / count;
   }
 
@@ -216,6 +328,14 @@ export function illuminanceAtPoint(
   const cosGamma = (dx * forward.x + dy * forward.y + dz * forward.z) * inv;
   const gamma = Math.acos(Math.min(Math.max(cosGamma, -1), 1)) * RAD;
   if (gamma > fixture.maxGamma) return 0;
+
+  // Deliberately the same table the loop uses, when there is one. Reading the
+  // exact function here instead would make this disagree with `solve` by the
+  // table's interpolation error, and `solver.test.ts` compares the two at every
+  // cell — it would look like a solver bug rather than a difference of method.
+  if (fixture.cosTable) {
+    return (sampleCosTable(fixture.cosTable, cosGamma) * cosIncidence * fixture.gain) / d2;
+  }
 
   let c = 0;
   if (!fixture.rotationallySymmetric) {

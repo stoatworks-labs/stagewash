@@ -36,7 +36,12 @@
  */
 
 import type { FixturePhotometrics, TabulatedPhotometry } from '../types';
-import { angleAtFraction, integrateFlux, peakCandela } from './distribution';
+import {
+  angleAtFraction,
+  integrateFlux,
+  peakCandela,
+  withUniformSteps,
+} from './distribution';
 
 export interface IesFile {
   photometrics: FixturePhotometrics;
@@ -183,12 +188,12 @@ export function parseIes(text: string): IesFile {
     warnings,
   );
 
-  const photometry: TabulatedPhotometry = {
+  const photometry: TabulatedPhotometry = withUniformSteps({
     kind: 'tabulated',
     gammaAngles: verticalAngles,
     cAngles,
     candela,
-  };
+  });
 
   const declaredLumens = lumensPerLamp < 0 ? -1 : lumensPerLamp * lampCount;
   if (lumensPerLamp < 0) {

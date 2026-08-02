@@ -14,7 +14,9 @@
   },
   "include": [
     "src/**/__tests__/**/*.ts",
+    "src/**/__bench__/**/*.ts",
     "src/**/*.test.ts",
+    "src/**/*.bench.ts",
     "src/domain/**/*.ts",
     "src/data/**/*.ts",
     "src/state/defaultProject.ts"

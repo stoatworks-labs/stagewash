@@ -1,6 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { fixtureFrame, vec } from '../geometry';
+import { fixtureFrame, sub, vec } from '../geometry';
+import { parseIes } from '../photometry/ies';
+import { maxGammaOf } from '../rig';
+
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 import { computeMetrics, findBlobs, footcandlesToLux, luxToFootcandles } from '../metrics';
 import { estimatePhotometrics } from '../photometry/estimator';
 import type { PreparedFixture } from '../rig';
@@ -211,6 +218,118 @@ describe('solve', () => {
       const scale = Math.max(Math.abs(expected), 1);
       expect(Math.abs(actual - expected) / scale).toBeLessThan(1e-6);
     }
+  });
+
+  it('never drops a contribution when it culls the grid', () => {
+    // The solver only visits the cells inside each fixture's bounding window.
+    // That is safe *only* because a fixture is exactly zero outside its cutoff
+    // cone — so this compares against a reference that visits every cell, on
+    // the geometry where culling actually bites: narrow beams, oblique aims,
+    // and a stage far bigger than any one of them covers.
+    const bigStage: Stage = { widthM: 24, depthM: 14, heightM: 0 };
+    const fixtures = [
+      // Steep and narrow: a small window near the middle.
+      makeFixture({
+        position: { x: -8, y: 4, z: 9 },
+        aimAt: { x: -8, y: 4, z: 0 },
+        peakCandela: 200_000,
+        fieldAngle: 10,
+      }),
+      // Very oblique from off the side: a long thin ellipse.
+      makeFixture({
+        position: { x: 14, y: -9, z: 8 },
+        aimAt: { x: -6, y: 10, z: 0 },
+        peakCandela: 150_000,
+        fieldAngle: 14,
+      }),
+      // Aimed clean off the stage: contributes only spill, or nothing.
+      makeFixture({
+        position: { x: 0, y: -10, z: 6 },
+        aimAt: { x: 0, y: -30, z: 0 },
+        peakCandela: 150_000,
+        fieldAngle: 20,
+      }),
+      // Wide, covering most of the stage: window is the whole grid.
+      makeFixture({
+        position: { x: 0, y: 5, z: 10 },
+        aimAt: { x: 0, y: 5, z: 0 },
+        peakCandela: 90_000,
+        fieldAngle: 100,
+      }),
+    ];
+
+    for (const orientation of ['horizontal', 'vertical'] as const) {
+      const field = buildSampleField(bigStage, {
+        orientation,
+        heightM: 1.5,
+        resolutionM: 0.25,
+      });
+      const { grid } = solve(fixtures, field);
+
+      let compared = 0;
+      for (let i = 0; i < grid.lux.length; i++) {
+        const point = {
+          x: field.points[i * 3] as number,
+          y: field.points[i * 3 + 1] as number,
+          z: field.points[i * 3 + 2] as number,
+        };
+        const expected = fixtures.reduce(
+          (sum, f) => sum + illuminanceAtPoint(f, point, field.normal),
+          0,
+        );
+        const actual = grid.lux[i] as number;
+        const scale = Math.max(Math.abs(expected), 1);
+        expect(Math.abs(actual - expected) / scale).toBeLessThan(1e-6);
+        if (expected > 0) compared++;
+      }
+
+      // Guard against the test passing because everything was zero.
+      expect(compared).toBeGreaterThan(100);
+    }
+  });
+
+  it('culls without changing the answer for a measured distribution', () => {
+    // Tabulated photometry takes a different path through the inner loop — it
+    // has no cosine table and its cutoff comes from the last live row of the
+    // file rather than from an analytic cutoff. Both need the same guarantee.
+    const ies = parseIes(
+      readFileSync(join(FIXTURES, 'etc-s4-36-hpl750-115.ies'), 'latin1'),
+    ).photometrics.photometry;
+
+    const position = vec(-4, -6, 8);
+    const aim = vec(2, 5, 1.5);
+    const fixture: PreparedFixture = {
+      id: 'measured',
+      channel: '1',
+      position,
+      frame: fixtureFrame(sub(aim, position), 0),
+      photometry: ies,
+      gain: 1,
+      maxGamma: maxGammaOf(ies),
+      rotationallySymmetric: false,
+    };
+
+    const field = buildSampleField(
+      { widthM: 20, depthM: 12, heightM: 0 },
+      { orientation: 'horizontal', heightM: 1.5, resolutionM: 0.25 },
+    );
+    const { grid } = solve([fixture], field);
+
+    let lit = 0;
+    for (let i = 0; i < grid.lux.length; i++) {
+      const point = {
+        x: field.points[i * 3] as number,
+        y: field.points[i * 3 + 1] as number,
+        z: field.points[i * 3 + 2] as number,
+      };
+      const expected = illuminanceAtPoint(fixture, point, field.normal);
+      const actual = grid.lux[i] as number;
+      const scale = Math.max(Math.abs(expected), 1);
+      expect(Math.abs(actual - expected) / scale).toBeLessThan(1e-6);
+      if (expected > 0) lit++;
+    }
+
+    expect(lit).toBeGreaterThan(50);
   });
 
   it('adds fixtures together', () => {

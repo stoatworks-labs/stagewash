@@ -30,7 +30,12 @@
  */
 
 import type { FixturePhotometrics, TabulatedPhotometry } from '../types';
-import { angleAtFraction, integrateFlux, peakCandela } from './distribution';
+import {
+  angleAtFraction,
+  integrateFlux,
+  peakCandela,
+  withUniformSteps,
+} from './distribution';
 
 export interface LdtFile {
   photometrics: FixturePhotometrics;
@@ -132,7 +137,12 @@ export function parseLdt(text: string): LdtFile {
 
   const { cAngles, candela } = expandSymmetry(iSym, mc, cAnglesRaw, stored, ng, scale, warnings);
 
-  const photometry: TabulatedPhotometry = { kind: 'tabulated', gammaAngles, cAngles, candela };
+  const photometry: TabulatedPhotometry = withUniformSteps({
+    kind: 'tabulated',
+    gammaAngles,
+    cAngles,
+    candela,
+  });
 
   return {
     photometrics: {

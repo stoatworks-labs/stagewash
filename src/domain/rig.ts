@@ -17,7 +17,12 @@ import {
   runLength,
   sub,
 } from './geometry';
-import { fieldAngleOf, scaleZoom } from './photometry/distribution';
+import {
+  buildCosTable,
+  fieldAngleOf,
+  scaleZoom,
+  type CosTable,
+} from './photometry/distribution';
 import type {
   FixtureModel,
   FixtureOptic,
@@ -47,6 +52,16 @@ export interface PreparedFixture {
   maxGamma: number;
   /** True when the distribution does not vary with C, so the solver skips atan2. */
   rotationallySymmetric: boolean;
+  /**
+   * Cosine-space intensity table, present only for rotationally symmetric
+   * analytic beams. When set, the solver reads intensity straight off it
+   * instead of computing `acos`, `pow` and `exp` per sample.
+   *
+   * `illuminanceAtPoint` uses it too, so the two never disagree — the test that
+   * pins them against each other at every cell would otherwise start failing
+   * for a reason that is not a bug.
+   */
+  cosTable?: CosTable;
 }
 
 export interface RigIssue {
@@ -247,6 +262,7 @@ export function prepareRig(
     const gain = fixture.level * fixture.transmission;
     if (gain <= 0) continue;
 
+    const symmetric = isRotationallySymmetric(photometry);
     fixtures.push({
       id: fixture.id,
       channel: fixture.channel,
@@ -255,7 +271,10 @@ export function prepareRig(
       photometry,
       gain,
       maxGamma: maxGammaOf(photometry),
-      rotationallySymmetric: isRotationallySymmetric(photometry),
+      rotationallySymmetric: symmetric,
+      ...(symmetric && photometry.kind === 'analytic'
+        ? { cosTable: buildCosTable(photometry) }
+        : {}),
     });
   }
 

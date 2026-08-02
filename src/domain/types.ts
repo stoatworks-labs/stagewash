@@ -110,6 +110,16 @@ export interface TabulatedPhotometry {
    * Float64Array if it ever needs to.
    */
   candela: number[];
+  /**
+   * Angular spacing in degrees, present only when the angles are evenly spaced.
+   *
+   * Real files almost always are — ETC's Source Four photometry is every 2° in
+   * both axes — and knowing it turns the interpolator's binary search into a
+   * divide. Detected once at parse time by `uniformStep`; absent means fall
+   * back to searching, which is always correct.
+   */
+  gammaStep?: number;
+  cStep?: number;
 }
 
 /**

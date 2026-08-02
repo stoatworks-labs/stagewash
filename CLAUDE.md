@@ -7,6 +7,7 @@ commands only.
 npm install
 npm run dev        # vite dev server, port 5199
 npm test           # vitest — 105 tests
+npm run bench      # vitest bench — solver performance
 npm run typecheck  # tsc -b (app + node + test projects)
 npm run lint       # oxlint
 npm run build      # tsc -b && vite build -> dist/
@@ -31,6 +32,10 @@ Key files:
   Anything containing an estimate must be named `Generic`.
 - `src/domain/__tests__/defaultRig.test.ts` — grid orientation (catches a mirrored
   heatmap) and the front-light-versus-top-light behaviour.
+- `src/domain/photometry/distribution.ts` — `buildCosTable` is the only place exactness is
+  traded for speed. Both `solve` and `illuminanceAtPoint` must use it or they diverge.
+- `src/domain/__tests__/cosTable.test.ts` — measures that trade (better than 1e-5 of peak
+  inside the beam). `src/domain/__bench__/solver.bench.ts` is the performance baseline.
 
 Write a PDF to disk while testing, instead of downloading it:
 

@@ -5,7 +5,7 @@
  * that interprets it lives here as a pure function.
  */
 
-import { DEG, clamp } from '../geometry';
+import { DEG, RAD, clamp } from '../geometry';
 import type { AnalyticPhotometry, Photometry, TabulatedPhotometry } from '../types';
 
 /**
@@ -44,7 +44,26 @@ function tabulatedIntensity(p: TabulatedPhotometry, c: number, gamma: number): n
   const gHi = gammaAngles[nG - 1] as number;
   if (gamma < gLo - 1e-9 || gamma > gHi + 1e-9) return 0;
 
-  const { i: gi, t: gt } = bracket(gammaAngles, clamp(gamma, gLo, gHi));
+  // Evenly spaced angles — which real files essentially always have — turn the
+  // binary search into a divide. This is the solver's inner loop; on a 180-plane
+  // ETC file the two searches were about eight iterations each, per sample,
+  // per fixture.
+  let gi: number;
+  let gt: number;
+  if (p.gammaStep !== undefined) {
+    const at = (clamp(gamma, gLo, gHi) - gLo) / p.gammaStep;
+    gi = at | 0;
+    if (gi >= nG - 1) {
+      gi = nG - 1;
+      gt = 0;
+    } else {
+      gt = at - gi;
+    }
+  } else {
+    const found = bracket(gammaAngles, clamp(gamma, gLo, gHi));
+    gi = found.i;
+    gt = found.t;
+  }
 
   if (nC === 1) {
     // Rotationally symmetric: one C plane covers everything.
@@ -53,7 +72,18 @@ function tabulatedIntensity(p: TabulatedPhotometry, c: number, gamma: number): n
 
   // C wraps at 360. The parser guarantees ascending angles starting at 0.
   const cw = ((c % 360) + 360) % 360;
-  const { i: ci, t: ct } = bracketCyclic(cAngles, cw);
+  let ci: number;
+  let ct: number;
+  if (p.cStep !== undefined) {
+    const at = cw / p.cStep;
+    ci = at | 0;
+    if (ci >= nC) ci = nC - 1;
+    ct = at - ci;
+  } else {
+    const found = bracketCyclic(cAngles, cw);
+    ci = found.i;
+    ct = found.t;
+  }
   const ciNext = (ci + 1) % nC;
 
   const a = lerp(
@@ -70,6 +100,51 @@ function tabulatedIntensity(p: TabulatedPhotometry, c: number, gamma: number): n
 }
 
 const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+
+/**
+ * The common spacing of an evenly spaced ascending list, or `undefined`.
+ *
+ * Used at parse time to let the interpolator index directly instead of
+ * searching. The tolerance is absolute and tight (1e-6°): a file whose angles
+ * drift would give wrong answers under direct indexing, so anything but
+ * genuinely uniform must fall back to the search.
+ */
+export function uniformStep(xs: number[]): number | undefined {
+  if (xs.length < 2) return undefined;
+
+  const step = (xs[1] as number) - (xs[0] as number);
+  if (!(step > 0)) return undefined;
+
+  for (let i = 2; i < xs.length; i++) {
+    const expected = (xs[0] as number) + step * i;
+    if (Math.abs((xs[i] as number) - expected) > 1e-6) return undefined;
+  }
+  return step;
+}
+
+/**
+ * Attach uniform-step hints to a tabulated distribution, if its angles qualify.
+ *
+ * The C hint additionally requires the planes to start at 0 and to wrap evenly
+ * back round to 360, because the interpolator indexes `c / cStep` with no
+ * offset and treats the last interval as wrapping to the first plane.
+ */
+export function withUniformSteps(p: TabulatedPhotometry): TabulatedPhotometry {
+  const gammaStep = uniformStep(p.gammaAngles);
+
+  let cStep = uniformStep(p.cAngles);
+  if (cStep !== undefined) {
+    const startsAtZero = Math.abs(p.cAngles[0] as number) < 1e-6;
+    const wrapsEvenly = Math.abs(cStep * p.cAngles.length - 360) < 1e-6;
+    if (!startsAtZero || !wrapsEvenly) cStep = undefined;
+  }
+
+  return {
+    ...p,
+    ...(gammaStep !== undefined ? { gammaStep } : {}),
+    ...(cStep !== undefined ? { cStep } : {}),
+  };
+}
 
 /** Index of the sample at or below `v`, plus the fraction toward the next. */
 function bracket(xs: number[], v: number): { i: number; t: number } {
@@ -103,6 +178,75 @@ function bracketCyclic(xs: number[], v: number): { i: number; t: number } {
 // ---------------------------------------------------------------------------
 // Characterisation
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Solver acceleration
+// ---------------------------------------------------------------------------
+
+/**
+ * Entries in a cosine-space intensity table. 2048 keeps the worst-case
+ * interpolation error near 1e-6 of peak while costing 8 kB a fixture.
+ */
+export const COS_TABLE_SIZE = 2048;
+
+/** A sampling of `I(gamma)` indexed by `cos gamma`, for the solver's hot loop. */
+export interface CosTable {
+  /** `cos` of the cutoff angle — the low end of the table. */
+  cosMin: number;
+  /** Reciprocal of the sample spacing in cos-space. */
+  invStep: number;
+  values: Float32Array;
+}
+
+/**
+ * Tabulate a rotationally symmetric analytic beam against **cos gamma**.
+ *
+ * The solver already has `cos gamma` in hand — it is a dot product — and
+ * currently spends an `acos`, a `Math.pow` and a `Math.exp` per sample to turn
+ * that into an intensity. All three collapse into one table lookup.
+ *
+ * Sampling in cosine space rather than in gamma is what makes this accurate
+ * rather than merely fast. Near the beam axis `cos gamma ~ 1 - gamma^2 / 2`, so
+ * `gamma^2 ~ 2(1 - cos gamma)`, and for the n ~ 2 exponent real optics have,
+ *
+ *     I ~ peak * (1 - k * gamma^2) ~ peak * (1 - 2k * (1 - cos gamma))
+ *
+ * — i.e. *linear* in cos gamma exactly where the beam is brightest and where
+ * error would matter most. Sampling uniformly in gamma would instead crowd
+ * samples into the axis, where the function is flattest, and starve the
+ * shoulder, where it is not.
+ *
+ * Only for rotationally symmetric beams. An elliptical one varies with the C
+ * plane too and cannot be reduced to a single curve; those keep the exact path.
+ */
+export function buildCosTable(p: AnalyticPhotometry): CosTable {
+  const cosMin = Math.cos(Math.min(p.cutoffGamma, 180) * DEG);
+  const span = 1 - cosMin;
+  const values = new Float32Array(COS_TABLE_SIZE + 1);
+
+  if (span <= 0) {
+    values.fill(p.peakCandela);
+    return { cosMin, invStep: 0, values };
+  }
+
+  for (let i = 0; i <= COS_TABLE_SIZE; i++) {
+    const cosGamma = cosMin + (span * i) / COS_TABLE_SIZE;
+    const gamma = Math.acos(cosGamma > 1 ? 1 : cosGamma) * RAD;
+    values[i] = gamma >= p.cutoffGamma ? 0 : p.peakCandela * Math.exp(-p.k * Math.pow(gamma, p.n));
+  }
+
+  return { cosMin, invStep: COS_TABLE_SIZE / span, values };
+}
+
+/** Sample a {@link CosTable}. `cosGamma` must already be above `cosMin`. */
+export function sampleCosTable(table: CosTable, cosGamma: number): number {
+  const at = (cosGamma - table.cosMin) * table.invStep;
+  const i = at | 0;
+  if (i >= COS_TABLE_SIZE) return table.values[COS_TABLE_SIZE] as number;
+  if (i < 0) return 0;
+  const a = table.values[i] as number;
+  return a + ((table.values[i + 1] as number) - a) * (at - i);
+}
 
 /** Peak candela anywhere in the distribution. */
 export function peakCandela(p: Photometry): number {
