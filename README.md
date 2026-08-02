@@ -60,6 +60,14 @@ ETC Source Four datasheets: within about 10% when given the manufacturer's own f
 lumens and angles, and within about 25% from bare lamp lumens alone. Those numbers are in
 the test suite, not marketing.
 
+**And the importer?** ETC's entire published Source Four photometric bundle — 132 real
+LM-63-02 files — parses with zero failures and zero warnings. Worth knowing what that
+exercise turned up: for four of eight fixtures ETC's own IES file and ETC's own datasheet
+agree to within 1%, and for the other four they differ by 5–15%, because the files and
+the sheets are different revisions. **±15% between two first-party sources for the same
+fixture is the real floor on accuracy in this business** — it is larger than anything the
+maths in here contributes.
+
 ## What is not modelled
 
 This is a **direct illuminance** calculation: inverse square, the cosine law, and each
@@ -70,7 +78,9 @@ shutter cuts, gobos or barn doors; or shadowing by people and scenery. On a dark
 that is the right model. In a white studio, inter-reflection can add a third again to
 these figures.
 
-Nothing here has been checked against a light meter on a real stage.
+Nothing here has been checked against a light meter on a real stage. The EULUMDAT (`.ldt`)
+reader has never seen a real fitting's file — only synthetic ones built to the spec — so
+treat it with more suspicion than the IES reader.
 
 ## Running it
 

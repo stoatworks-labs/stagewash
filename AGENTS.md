@@ -151,8 +151,62 @@ The three measured Zoom positions independently confirm the zoom model: field lu
 within 7% across 16°/23°/31° while centre-beam candela tracks the inverse square of the
 angle ratio to 0.3%. So `scaleZoom` conserves **flux**, exactly — not peak intensity.
 
+## 6a. The IES reader is validated against real manufacturer files
+
+`iesReal.test.ts`. The full **"Source Four HPL IES Photometry Data Files (LM-63-02
+Format)"** bundle from etcconnect.com — **132 real files** — parses with **zero failures
+and zero warnings**. Three are vendored in `__tests__/fixtures/` (144 kB); point
+`STAGEWASH_IES_DIR` at an extract of the bundle to sweep the lot:
+
+```bash
+STAGEWASH_IES_DIR=/path/to/extract npx vitest run iesReal
+```
+
+Real files exercised things no synthetic fixture here happened to: a candela multiplier
+of **96.96**, **181 C planes** encoded as a full 0–360 sweep, keywords with **no space
+after the bracket** (`[TEST]#7`), rows wrapped mid-number at column 80, and
+Windows-codepage degree signs — hence reading as `latin1`, not `utf8`, or the citation
+string in the UI becomes mojibake.
+
+### Datasheet and IES disagree, for the same fixture
+
+Cross-checking the parsed files against the datasheet figures in `calibration.test.ts`:
+
+| fixture | datasheet cd | IES cd | Δ |
+|---|---|---|---|
+| PARNel flood | 47,050 | 47,028 | −0.05% |
+| PAR MCM VNSP | 343,440 | 343,912 | +0.1% |
+| PARNel spot | 190,390 | 187,964 | −1.3% |
+| S4jr 26° | 91,480 | 91,053 | −0.5% |
+| Zoom 30° | 105,690 | 99,907 | −5.5% |
+| Zoom 23° | 181,685 | 203,307 | +11.9% |
+| S4 36° | 90,885 | 103,167 | +13.5% |
+| Zoom 15° | 395,560 | 334,125 | −15.5% |
+
+Four agree to within about 1%, which is strong evidence the reader is correct — a parser
+bug in the multiplier or the table indexing would put *every* file out by a similar
+factor, not four of eight spot on. The rest is **ETC disagreeing with ETC**: the files
+were tested 2003 and issued 2007, the datasheets are a different revision, and the S4 36°
+beam angle is 21.3° measured against 27° published while its *field* angle matches (32.9°
+vs 34°).
+
+Two consequences. First, ±15% between two first-party sources for the same fixture is the
+real floor on accuracy here, and it is worth more than any refinement to the estimator.
+Second, **the datasheet-derived `published` entries in `data/fixtures.ts` were left as
+they are** — they are correctly cited transcriptions, and replacing them with IES-derived
+numbers would embed ETC's photometric data in the shipped bundle, which is a
+redistribution question rather than a technical one. Import the file to get `measured`.
+
 ## 7. Traps that already cost time
 
+- **A measured table's cutoff is its last *live* row, not its last measured row.**
+  Photometric files are sampled over the whole hemisphere whatever the fixture does —
+  ETC's run to 90° in 2° steps — so a 36° spot has ~30 rows of literal `0.00`. Taking 90°
+  at face value defeats the solver's early-out and it evaluates the full table, two binary
+  searches and an `atan2`, across most of the stage to add nothing. Four imported fixtures
+  took a solve from 3.5 ms to 30.8 ms; trimming trailing zero rows in `maxGammaOf` brought
+  it back to ~1.3 ms. The trim is lossless by construction, and `iesReal.test.ts` asserts
+  that everything past the reported cutoff really is zero in every C plane.
 - **`scaleZoom` conserves flux exactly, by integration, not by the ratio-squared rule.**
   That rule assumes `sin γ ≈ γ` and is 0.8% out at a 45° field, worse wider. The
   correction costs one integration per zoom change, which happens on user input, never on
@@ -188,12 +242,10 @@ angle ratio to 0.3%. So `scaleZoom` conserves **flux**, exactly — not peak int
 
 Be straight about this in any report or release note.
 
-- **No real manufacturer IES or LDT file has ever been through the parsers.** They are
-  tested against synthetic files built to the spec, including symmetry expansion,
-  multipliers, embedded TILT blocks and every `Isym` case — and the import path has been
-  driven end-to-end in the browser with a generated file. But ETC's own `.ies` downloads
-  sit behind site navigation and were not fetched. **EULUMDAT in particular has never
-  seen a real fitting's file** and is the more likely of the two to have a positional bug.
+- **EULUMDAT has never seen a real fitting's file.** `ldt.ts` is tested only against
+  synthetic files built to the spec — every `Isym` case, the cd/1000 lm scaling, the
+  lamp-set skip. It is now the weakest link in the codebase and the likeliest place for a
+  positional bug. (The IES reader *has* been validated — see §6a.)
 - **No result has been checked against a light meter.** Nothing here has been near a
   stage.
 - **The `Generic` archetypes are archetypes.** The fresnel, PC, cyc and batten efficiency

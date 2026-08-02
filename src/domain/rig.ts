@@ -124,11 +124,49 @@ export function resolvePhotometry(
   return { photometry: scaleZoom(stored, wanted), zoomIsExact: true };
 }
 
-/** Largest gamma at which a distribution still emits, degrees. */
+/**
+ * Largest gamma at which a distribution still emits, degrees.
+ *
+ * The solver uses this as a one-comparison early-out, so it wants to be as
+ * tight as it can honestly be.
+ *
+ * For a measured table that means **the last gamma that actually carries
+ * light**, not the last gamma that was measured. A real photometric file is
+ * sampled over the whole hemisphere whatever the fixture does — ETC's Source
+ * Four files run to 90° in 2° steps — and for a 36° spot every row past about
+ * 26° is a literal `0.00`. Returning 90° there makes the solver evaluate the
+ * full table, two binary searches and an `atan2`, for most of the stage, to
+ * add nothing: measured on the default rig, four imported fixtures took the
+ * solve from 3.5 ms to 30.8 ms.
+ *
+ * Trimming trailing all-zero rows is exactly lossless — those rows contribute
+ * nothing by definition — and one sample step is kept beyond the last live row
+ * so interpolation into the first zero row still happens.
+ */
 export function maxGammaOf(p: Photometry): number {
   if (p.kind === 'analytic') return p.cutoffGamma;
-  const last = p.gammaAngles[p.gammaAngles.length - 1];
-  return last ?? 180;
+
+  const { gammaAngles, cAngles, candela } = p;
+  const nG = gammaAngles.length;
+  const nC = cAngles.length;
+  if (nG === 0) return 180;
+
+  for (let gi = nG - 1; gi >= 0; gi--) {
+    let live = false;
+    for (let ci = 0; ci < nC; ci++) {
+      if ((candela[ci * nG + gi] as number) > 0) {
+        live = true;
+        break;
+      }
+    }
+    if (live) {
+      // Keep one step past the last live row.
+      return gammaAngles[Math.min(gi + 1, nG - 1)] as number;
+    }
+  }
+
+  // Nothing anywhere. The fixture emits no light; the solver will skip it.
+  return 0;
 }
 
 function isRotationallySymmetric(p: Photometry): boolean {
