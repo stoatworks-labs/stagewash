@@ -20,7 +20,9 @@
 
 import {
   AdditiveBlending,
+  Box3,
   BufferGeometry,
+  type Camera,
   Color,
   ConeGeometry,
   DoubleSide,
@@ -31,6 +33,7 @@ import {
   LineSegments,
   Mesh,
   MeshBasicMaterial,
+  OrthographicCamera,
   PerspectiveCamera,
   PlaneGeometry,
   Scene,
@@ -72,9 +75,32 @@ export interface SceneHandle {
   setHeatmap: (grid: Grid | null, scaleMax: number | null, ramp: Ramp) => void;
   setOptions: (options: SceneOptions) => void;
   frameAll: () => void;
-  setView: (view: 'plan' | 'section' | 'iso') => void;
+  /**
+   * Point the camera. With `fit`, the whole rig is framed at the current
+   * aspect — which is what an exported plot needs and what an interactively
+   * orbited viewport must not do behind the user's back. A fitted `plan` or
+   * `section` also switches to a parallel projection; see `fitOrthographic`.
+   */
+  setView: (view: ViewName, fit?: boolean) => void;
+  /** The camera the viewport orbits and picks with. Always perspective. */
   camera: PerspectiveCamera;
-  dispose: () => void;
+  /**
+   * The camera the last `render` actually used — which is not `camera` after a
+   * fitted plan. Anything projecting world points into the frame has to ask for
+   * this one, or it will place them under a different projection to the picture.
+   */
+  renderCamera: () => Camera;
+  /**
+   * Free three's GPU resources.
+   *
+   * `releaseContext` additionally hands the WebGL context back, which a browser
+   * needs because it only allows a handful at once and the report opens a new
+   * one every time it runs. Pass it **only** when the canvas is being thrown
+   * away with the scene: a canvas whose context has been force-lost can never
+   * be given another one, so doing this to a canvas that will be mounted again
+   * — a React remount, a StrictMode double-invoke — leaves a dead viewport.
+   */
+  dispose: (releaseContext?: boolean) => void;
   /** Pick a fixture id at normalised device coordinates, or null. */
   pick: (ndcX: number, ndcY: number) => string | null;
 }
@@ -88,9 +114,74 @@ export interface SceneOptions {
   isolateSelection: boolean;
 }
 
-export function createScene(canvas: HTMLCanvasElement): SceneHandle {
-  const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+export type ViewName = 'plan' | 'section' | 'iso';
+
+/**
+ * Camera directions, as a unit vector from the subject towards the camera.
+ *
+ * `plan` carries a whisker of -y so that it is not exactly parallel to the
+ * camera's up vector (+z): the cross product that builds the view basis
+ * collapses when they are, and the frame ends up rolled to an arbitrary angle.
+ * That whisker also settles which way round the plan reads — upstage at the
+ * top, downstage at the bottom, as on a lighting plot.
+ */
+const VIEW_DIRECTIONS: Record<ViewName, Vector3> = {
+  plan: new Vector3(0, -0.0001, 1).normalize(),
+  section: new Vector3(0, -1, 0.15).normalize(),
+  iso: new Vector3(0.9, -1.1, 0.8).normalize(),
+};
+
+/**
+ * Everything a plot has to contain: the deck, both ends of every structure —
+ * including a stand's base, which is on the floor rather than at `from.z` — and
+ * every hang point. The heatmap covers exactly the deck, so it needs no
+ * separate term.
+ *
+ * Exported because the report sizes its pictures from this. A rig is often
+ * deeper than it is wide once a FOH position is included, and a plan of it
+ * drawn in a landscape frame is mostly empty.
+ */
+export function contentBounds(project: Project): Box3 {
+  const { widthM, depthM, heightM } = project.stage;
+  const box = new Box3();
+  box.expandByPoint(new Vector3(-widthM / 2, 0, Math.min(0, heightM)));
+  box.expandByPoint(new Vector3(widthM / 2, depthM, heightM));
+
+  for (const structure of project.structures) {
+    box.expandByPoint(new Vector3(structure.from.x, structure.from.y, structure.from.z));
+    box.expandByPoint(new Vector3(structure.to.x, structure.to.y, structure.to.z));
+    if (structure.kind === 'stand') {
+      box.expandByPoint(new Vector3(structure.from.x, structure.from.y, 0));
+    }
+  }
+  for (const f of project.fixtures) {
+    box.expandByPoint(new Vector3(f.position.x, f.position.y, f.position.z));
+  }
+  return box;
+}
+
+export interface SceneSetup {
+  /**
+   * Keep the drawing buffer after the frame is composited, so `toDataURL` on
+   * the canvas returns the picture rather than an empty rectangle. Off for the
+   * live viewport, which never reads itself back and pays for the copy.
+   */
+  preserveDrawingBuffer?: boolean;
+  /**
+   * Pin the device pixel ratio. The report renderer sets this so an exported
+   * plot is the same resolution on a laptop as on a 5K display.
+   */
+  pixelRatio?: number;
+}
+
+export function createScene(canvas: HTMLCanvasElement, setup: SceneSetup = {}): SceneHandle {
+  const renderer = new WebGLRenderer({
+    canvas,
+    antialias: true,
+    alpha: false,
+    preserveDrawingBuffer: setup.preserveDrawingBuffer ?? false,
+  });
+  renderer.setPixelRatio(setup.pixelRatio ?? Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(new Color(0x080d13), 1);
 
   const scene = new Scene();
@@ -100,6 +191,23 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
   // whole model rotated into three's y-up convention.
   camera.up.set(0, 0, 1);
   camera.position.set(0, -18, 12);
+
+  /**
+   * The parallel-projection camera, used only for a fitted plan or section.
+   *
+   * A perspective "plan" is not a plan. The rig hangs six metres above the deck
+   * the heatmap is painted on, so perspective throws every fixture outwards
+   * from its true position — by a factor of four once the camera is close
+   * enough for the stage to fill the frame. Anyone reading a position off it
+   * would be wrong, and the wireframe would no longer sit over the heatmap it
+   * is meant to be a key to. Orthographic puts every fixture exactly on its own
+   * x, y, which is the entire point of drawing a plan.
+   */
+  const orthographic = new OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+  orthographic.up.set(0, 0, 1);
+
+  let active: Camera = camera;
+  let aspect = 1;
 
   const stageGroup = new Group();
   const structureGroup = new Group();
@@ -484,8 +592,127 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
     camera.updateProjectionMatrix();
   }
 
-  function setView(view: 'plan' | 'section' | 'iso'): void {
+  /**
+   * The content's extent in a camera's own basis: how far it reaches sideways,
+   * how far up and down the frame, and how deep it runs along the view axis.
+   */
+  function extentsAlong(
+    box: Box3,
+    centre: Vector3,
+    xAxis: Vector3,
+    yAxis: Vector3,
+    zAxis: Vector3,
+  ): { x: number; y: number; depth: number } {
+    const corner = new Vector3();
+    let x = 0;
+    let y = 0;
+    let depth = 0;
+
+    for (let i = 0; i < 8; i++) {
+      corner
+        .set(
+          i & 1 ? box.max.x : box.min.x,
+          i & 2 ? box.max.y : box.min.y,
+          i & 4 ? box.max.z : box.min.z,
+        )
+        .sub(centre);
+      x = Math.max(x, Math.abs(corner.dot(xAxis)));
+      y = Math.max(y, Math.abs(corner.dot(yAxis)));
+      depth = Math.max(depth, Math.abs(corner.dot(zAxis)));
+    }
+
+    return { x, y, depth };
+  }
+
+  function viewBasis(direction: Vector3, up: Vector3) {
+    const zAxis = direction.clone().normalize();
+    const xAxis = new Vector3().crossVectors(up, zAxis).normalize();
+    const yAxis = new Vector3().crossVectors(zAxis, xAxis).normalize();
+    return { xAxis, yAxis, zAxis };
+  }
+
+  /**
+   * Frame the content in parallel projection: no distance to solve, just a
+   * frustum wide enough for the extents, and the camera far enough back that
+   * nothing lands behind the near plane.
+   */
+  function fitOrthographic(direction: Vector3, margin: number): void {
     if (!currentProject) return;
+    const box = contentBounds(currentProject);
+    const centre = box.getCenter(new Vector3());
+    const { xAxis, yAxis, zAxis } = viewBasis(direction, orthographic.up);
+    const extent = extentsAlong(box, centre, xAxis, yAxis, zAxis);
+
+    const halfHeight = Math.max(extent.y, extent.x / aspect, 0.5) * margin;
+    const halfWidth = halfHeight * aspect;
+
+    orthographic.left = -halfWidth;
+    orthographic.right = halfWidth;
+    orthographic.top = halfHeight;
+    orthographic.bottom = -halfHeight;
+    orthographic.near = 0.1;
+    orthographic.far = extent.depth * 4 + 100;
+    orthographic.position.copy(centre).addScaledVector(zAxis, extent.depth * 2 + 20);
+    orthographic.lookAt(centre);
+    orthographic.updateProjectionMatrix();
+    active = orthographic;
+  }
+
+  /**
+   * Solve the camera distance that just contains the content.
+   *
+   * Fitting the bounding *sphere* is the one-liner and it wastes a third of the
+   * frame on a stage, which is a wide flat box. So each of the eight corners is
+   * asked how far back the camera would have to be for it to sit on the edge of
+   * the frustum — accounting for the corner's own depth, which is what the
+   * sphere version throws away — and the furthest answer wins.
+   */
+  function fitPerspective(direction: Vector3, margin: number): void {
+    if (!currentProject) return;
+    const box = contentBounds(currentProject);
+    const centre = box.getCenter(new Vector3());
+    const { xAxis, yAxis, zAxis } = viewBasis(direction, camera.up);
+
+    const tanV = Math.tan((camera.fov / 2) * DEG) / margin;
+    const tanH = tanV * camera.aspect;
+
+    let distance = 0;
+    const corner = new Vector3();
+    for (let i = 0; i < 8; i++) {
+      corner
+        .set(
+          i & 1 ? box.max.x : box.min.x,
+          i & 2 ? box.max.y : box.min.y,
+          i & 4 ? box.max.z : box.min.z,
+        )
+        .sub(centre);
+      const depth = corner.dot(zAxis);
+      distance = Math.max(
+        distance,
+        Math.abs(corner.dot(xAxis)) / tanH + depth,
+        Math.abs(corner.dot(yAxis)) / tanV + depth,
+      );
+    }
+
+    camera.position.copy(centre).addScaledVector(zAxis, Math.max(distance, 1));
+    camera.lookAt(centre);
+    camera.updateProjectionMatrix();
+    active = camera;
+  }
+
+  function setView(view: ViewName, fit = false): void {
+    if (!currentProject) return;
+    if (fit) {
+      // `iso` stays perspective: it is a pictorial view of the rig, and it is
+      // what the app's own Iso button shows. Plan and section are drawing
+      // conventions, and both of those mean parallel projection.
+      if (view === 'iso') fitPerspective(VIEW_DIRECTIONS[view], 1.06);
+      else fitOrthographic(VIEW_DIRECTIONS[view], 1.06);
+      return;
+    }
+
+    active = camera;
+
     const { widthM, depthM } = currentProject.stage;
     const centre = new Vector3(0, depthM / 2, 0);
     const radius = Math.max(widthM, depthM);
@@ -536,11 +763,14 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
   return {
     camera,
 
-    render: () => renderer.render(scene, camera),
+    renderCamera: () => active,
+
+    render: () => renderer.render(scene, active),
 
     resize: (width, height) => {
       renderer.setSize(width, height, false);
-      camera.aspect = height > 0 ? width / height : 1;
+      aspect = height > 0 ? width / height : 1;
+      camera.aspect = aspect;
       camera.updateProjectionMatrix();
     },
 
@@ -576,7 +806,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
     setView,
     pick,
 
-    dispose: () => {
+    dispose: (releaseContext = false) => {
       clear(stageGroup);
       clear(structureGroup);
       clear(fixtureGroup);
@@ -584,6 +814,7 @@ export function createScene(canvas: HTMLCanvasElement): SceneHandle {
       clear(footprintGroup);
       clear(heatmapGroup);
       renderer.dispose();
+      if (releaseContext) renderer.forceContextLoss();
     },
   };
 }

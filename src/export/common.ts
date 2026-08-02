@@ -31,6 +31,13 @@ export interface ReportInput {
   perFixtureAvg: Map<string, number>;
   issues: RigIssue[];
   unit: Unit;
+  /**
+   * The top of the colour scale, if the user has pinned one. Carried into the
+   * report so its plots and its legend are on the same scale as the screen —
+   * a pinned scale is usually pinned in order to compare two rigs, and a
+   * report that quietly went back to autoscaling would break the comparison.
+   */
+  scaleMaxLux: number | null;
 }
 
 /** The raw grid, one row per sample, for anyone who wants to do their own maths. */

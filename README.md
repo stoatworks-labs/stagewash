@@ -20,7 +20,10 @@ the tab.
 - **Find the problems.** Uniformity, coverage against a design level, and contiguous hot
   and dark spots listed by area with their centres.
 - **Report.** A PDF with the levels, the problem areas, a full fixture schedule with
-  focus and heights, and the structural loading. CSV of the schedule and of the raw grid.
+  focus and heights, and the structural loading. It carries three plots drawn from the
+  same model: the heatmap in plan with a colour key, an isometric of the rig and its
+  beams, and a wireframe layout by channel that shares the plan's frame, so a pool on the
+  map sits over the fixture that made it. CSV of the schedule and of the raw grid.
 
 ## The two planes, which is the point
 

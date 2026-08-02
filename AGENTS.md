@@ -39,6 +39,9 @@ src/
   state/         zustand store, the default rig, the solver client
   workers/       The solve, off the main thread
   render/        three.js scene + the heatmap colour ramp
+    scene.ts         The wireframe plot. Also the camera fitting the report uses.
+    heatmap.ts       The ramp, the texture, the choice of scale
+    plots.ts         The report's three pictures, rendered offscreen
   ui/            React. Presentation only — no photometry arithmetic in here.
   export/        common.ts (CSV + types, no jsPDF) and pdf.ts (dynamically imported)
 ```
@@ -49,6 +52,11 @@ part the product's correctness rests on. If you find yourself importing a hook i
 
 **`ui/` must not do photometric arithmetic.** The 3D view, the report and the solver have
 to agree, and the only way to guarantee that is one implementation.
+
+**The report's pictures come from the same scene as the viewport.** `render/plots.ts`
+builds `createScene` against an offscreen canvas and reads three frames back, rather than
+painting the grid into a 2D canvas of its own. A second drawing routine would be less code
+and would drift from the screen the first time either was touched.
 
 ## 3. Build, run, test
 
@@ -321,7 +329,25 @@ window padding makes those tests fail, which is how you know they are load-beari
   vertical.** Without that, a fixture tilted to exactly −90° (a downlight, very common)
   gets a degenerate frame and an asymmetric distribution spins arbitrarily.
 - **Beam cones are additively blended and bleach the heatmap.** Default opacity is 0.045
-  for that reason. Raising it is a user choice, not a default.
+  for that reason. Raising it is a user choice, not a default. The report's isometric goes
+  to 0.06 because it is read at a third of the size and on paper; much past that and the
+  heatmap under the beams disappears.
+- **A perspective "plan" is not a plan.** The rig hangs 6 m above the deck the heatmap is
+  painted on, so perspective throws every fixture outwards from its true position — by 4×
+  once the camera is close enough for the stage to fill the frame. The report's plan and
+  layout use `setView(view, true)`, which fits an **orthographic** camera; that is the only
+  reason the wireframe can act as a key to the heatmap. `scene.renderCamera()`, not
+  `scene.camera`, is what projected labels have to be placed with.
+- **`forceContextLoss()` kills a canvas permanently.** A canvas whose context has been
+  force-lost can never be given another one, so calling it on the viewport's canvas leaves
+  a dead viewport after any remount — StrictMode's double-invoke does it on the first
+  render. `dispose(true)` is therefore opt-in, and only `plots.ts` passes it, because it
+  throws its canvas away. It does have to: a browser allows only a handful of live WebGL
+  contexts, and the report opens one per export.
+- **A rig is often deeper than it is wide.** A FOH bar 7 m out from a 6 m stage makes the
+  footprint portrait, and a plan of it drawn in a landscape frame is a third black. The
+  report sizes its plan from `contentBounds` and fits the picture into a fixed box on the
+  page, so the page reads the same whatever shape the rig is.
 - **The heatmap is a `DataTexture`, whose `flipY` is `false`** unlike an image texture.
   `defaultRig.test.ts` has a deliberately asymmetric downlight test that fails if either
   axis is mirrored — a near-symmetric rig hides a flip completely.
@@ -347,6 +373,10 @@ Be straight about this in any report or release note.
   of its white output; use the fixture's transmission control to account for it.
 - **Structural loading counts fixture weight only** — no clamps, cable, or the truss
   itself — and is a sanity check, not an engineering calculation.
+- **The report's plots have never been printed.** They were checked as generated PDFs on
+  screen, at several rig shapes. They are dark-background pictures, deliberately, so that
+  they match what the app shows — which is a lot of toner, and the 5 pt channel labels on
+  the layout are near the limit of a laser printer. Nobody has put one on paper.
 
 ## 9. Conventions
 

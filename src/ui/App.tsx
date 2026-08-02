@@ -36,6 +36,7 @@ export function App(): React.ReactElement {
   const duplicateSelected = useStore((s) => s.duplicateSelected);
   const selectAll = useStore((s) => s.selectAll);
   const solveState = useStore((s) => s.solveState);
+  const scaleMaxLux = useStore((s) => s.view.scaleMaxLux);
 
   // --- keyboard ------------------------------------------------------------
   useEffect(() => {
@@ -79,7 +80,7 @@ export function App(): React.ReactElement {
   const reportInput = () => {
     const { grid, metrics, blobs, perFixtureAvg, issues } = solveState;
     if (!grid || !metrics) return null;
-    return { project, grid, metrics, blobs, perFixtureAvg, issues, unit };
+    return { project, grid, metrics, blobs, perFixtureAvg, issues, unit, scaleMaxLux };
   };
 
   const exportPdf = async (): Promise<void> => {

@@ -58,11 +58,18 @@ function sampleRamp(t: number): [number, number, number] {
 
 /** Colour for a normalised level, as CSS — used by the legend and the report. */
 export function rampColour(t: number, ramp: Ramp = 'viridis'): string {
-  const [r, g, b] = colourFor(t, ramp);
+  const [r, g, b] = rampRgb(t, ramp);
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-function colourFor(t: number, ramp: Ramp): [number, number, number] {
+/**
+ * The same colour as RGB components, 0..255.
+ *
+ * The PDF legend needs numbers rather than a CSS string, and it has to be the
+ * *same* ramp the texture was built from or the report's key would describe a
+ * map it does not match.
+ */
+export function rampRgb(t: number, ramp: Ramp = 'viridis'): [number, number, number] {
   if (ramp === 'grey') {
     const v = Math.round(Math.max(0, Math.min(1, t)) * 255);
     return [v, v, v];
@@ -125,7 +132,7 @@ export function buildHeatmapTexture(
 
   for (let i = 0; i < cols * rows; i++) {
     const t = ((lux[i] as number) - scale.min) * inv;
-    const [r, g, b] = colourFor(t, ramp);
+    const [r, g, b] = rampRgb(t, ramp);
     const o = i * 4;
     data[o] = r;
     data[o + 1] = g;
