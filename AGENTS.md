@@ -151,7 +151,30 @@ The three measured Zoom positions independently confirm the zoom model: field lu
 within 7% across 16°/23°/31° while centre-beam candela tracks the inverse square of the
 angle ratio to 0.3%. So `scaleZoom` conserves **flux**, exactly — not peak intensity.
 
-## 6a. The IES reader is validated against real manufacturer files
+## 6a. Both parsers are validated against real manufacturer files
+
+`__tests__/fixtures/README.md` records exactly which files and why.
+
+### EULUMDAT — `ldtReal.test.ts`
+
+Six real files covering **every** symmetry case the format defines (`Isym` 0–4) and all
+three `Ityp` values, from the MIT-licensed test corpus of `123VincentB/eulumdat-py`.
+
+The check worth understanding: a EULUMDAT header declares the lamp's total flux, and the
+table separately carries candela in **cd/1000 lm**. Those two are independent — one is
+typed in, the other measured — so integrating the parsed table over the sphere and
+comparing it against the declared flux exercises the scaling, the angle assignment and,
+above all, the **symmetry expansion**, because mirroring the wrong planes changes the
+integral. It lands **within 0.1%** on every file whose luminaire emits all of its lamp's
+light.
+
+The best single file is `ldt-isym0-lor-88pct.ldt`: a LEDiL optic declaring a 400 lm lamp
+and a light output ratio of **88.63%** on header line 23. Integrating its table gives
+88.7% of 400 lm. Nothing in the reader knows about that ratio — it falls out of the
+measured data — which rules out the whole class of bug where a parser quietly scales a
+table to make the flux "come out right".
+
+### IES — `iesReal.test.ts`
 
 `iesReal.test.ts`. The full **"Source Four HPL IES Photometry Data Files (LM-63-02
 Format)"** bundle from etcconnect.com — **132 real files** — parses with **zero failures
@@ -242,10 +265,10 @@ redistribution question rather than a technical one. Import the file to get `mea
 
 Be straight about this in any report or release note.
 
-- **EULUMDAT has never seen a real fitting's file.** `ldt.ts` is tested only against
-  synthetic files built to the spec — every `Isym` case, the cd/1000 lm scaling, the
-  lamp-set skip. It is now the weakest link in the codebase and the likeliest place for a
-  positional bug. (The IES reader *has* been validated — see §6a.)
+- **Neither parser has been validated against a *stage-fixture* EULUMDAT file.** `ldt.ts`
+  is validated against six real files covering every `Isym` case (see §6a), but they are
+  architectural and street fittings — Tulux, LEDiL — because entertainment manufacturers
+  publish IES. A theatre fixture's `.ldt` should be fine; nothing in the format changes.
 - **No result has been checked against a light meter.** Nothing here has been near a
   stage.
 - **The `Generic` archetypes are archetypes.** The fresnel, PC, cyc and batten efficiency

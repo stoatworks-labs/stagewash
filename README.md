@@ -61,12 +61,17 @@ lumens and angles, and within about 25% from bare lamp lumens alone. Those numbe
 the test suite, not marketing.
 
 **And the importer?** ETC's entire published Source Four photometric bundle — 132 real
-LM-63-02 files — parses with zero failures and zero warnings. Worth knowing what that
-exercise turned up: for four of eight fixtures ETC's own IES file and ETC's own datasheet
-agree to within 1%, and for the other four they differ by 5–15%, because the files and
-the sheets are different revisions. **±15% between two first-party sources for the same
-fixture is the real floor on accuracy in this business** — it is larger than anything the
-maths in here contributes.
+LM-63-02 files — parses with zero failures and zero warnings. The EULUMDAT reader is
+checked against real files covering every symmetry case the format defines, by
+integrating each candela table over the sphere and confirming it comes back to the lamp
+flux the file declares — within 0.1%, and on a LEDiL street optic it independently
+recovers that luminaire's own stated 88.63% light output ratio.
+
+Worth knowing what that exercise turned up: for four of eight fixtures ETC's own IES file
+and ETC's own datasheet agree to within 1%, and for the other four they differ by 5–15%,
+because the files and the sheets are different revisions. **±15% between two first-party
+sources for the same fixture is the real floor on accuracy in this business** — it is
+larger than anything the maths in here contributes.
 
 ## What is not modelled
 
@@ -78,9 +83,7 @@ shutter cuts, gobos or barn doors; or shadowing by people and scenery. On a dark
 that is the right model. In a white studio, inter-reflection can add a third again to
 these figures.
 
-Nothing here has been checked against a light meter on a real stage. The EULUMDAT (`.ldt`)
-reader has never seen a real fitting's file — only synthetic ones built to the spec — so
-treat it with more suspicion than the IES reader.
+Nothing here has been checked against a light meter on a real stage.
 
 ## Running it
 
