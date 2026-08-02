@@ -32,10 +32,19 @@
   box-sizing: border-box;
 }
 
+/*
+ * The tool still fills the viewport exactly (see `.app` below) — but the page
+ * itself is allowed to scroll past it, because the support footer is appended
+ * after #root and the viewport lock here made it unreachable. Height moved off
+ * html/body/#root and onto `.app` as 100vh: leaving `height: 100%` here while
+ * body grew past the viewport left `.app`'s percentage height resolving against
+ * an auto-height parent, which collapses the 1fr row and lets the panes grow
+ * without bound instead of scrolling inside themselves. Same fix, same reason,
+ * as the worked example at the top of pixel-peeker/src/styles.css.
+ */
 html,
 body,
 #root {
-  height: 100%;
   margin: 0;
 }
 
@@ -55,7 +64,7 @@ body {
 .app {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  height: 100%;
+  height: 100vh;
   overflow: hidden;
 }
 
