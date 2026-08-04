@@ -98,6 +98,10 @@ npm run dev
 Then open the port it prints. `npm test` runs the suite; `npm run build` produces a
 static `dist/`.
 
+<!-- attributions:start -->
+This project is built on other people's work — see [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+<!-- attributions:end -->
+
 ## Licence
 
 MIT.
