@@ -1,5 +1,16 @@
 # stagewash
 
+> **AI-assisted project.** This codebase was created with [Claude Code](https://claude.com/claude-code)
+> (Anthropic), directed and reviewed by a human author. The illuminance model is calibrated rather
+> than assumed: eight published photometric rows transcribed from ETC Source Four datasheets are
+> held as tests, and the estimator lands within about 10% given a manufacturer's own field lumens
+> and about 25% from bare lamp lumens alone. The importers are checked against real files — ETC's
+> entire published Source Four bundle, 132 LM-63-02 files, parses with no failures or warnings, and
+> EULUMDAT candela tables integrate back over the sphere to the lamp flux the file declares within
+> 0.1%. 141 tests in total. But this is a **direct illuminance** calculation only — no
+> inter-reflection, haze, shutter cuts, gobos or shadowing — and **nothing here has ever been
+> checked against a light meter on a real stage.**
+
 Model a stage and a lighting rig, focus the fixtures, and see the light levels and
 coverage on the deck — before you get to the venue.
 
