@@ -384,3 +384,10 @@ Repo conventions per the fleet: `CLAUDE.md` is the command reference, this file 
 mental model. Deployment is a Cloudflare **Worker with static assets** (`wrangler.toml`
 `[assets]`), never Pages — the two config keys are not interchangeable. Deploy with
 `cf-run npx wrangler deploy` so the keychain token is used; never `wrangler login`.
+
+## Notes
+
+`docs/NOTES.md` carries this repo's working notes — current status, decisions
+already made, and the traps that have actually bitten. Read it before changing
+anything non-obvious. Cross-cutting fleet knowledge lives in
+[fleet-notes](https://github.com/stoatworks-labs/fleet-notes).
