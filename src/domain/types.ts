@@ -236,8 +236,18 @@ export interface FixtureOptic {
   label: string;
   photometrics: FixturePhotometrics;
   /**
-   * For a zoom fixture, the continuous range this optic covers. The stored
-   * photometry is at `zoomMin`; `scaleZoom` derives intermediate angles.
+   * For a zoom fixture, the continuous range this optic covers, **in field
+   * angle** — 10% of peak, like every other angle the app reasons with.
+   * `resolvePhotometry` and `clampZoom` both read them that way.
+   *
+   * Worth stating because a manufacturer's marketed zoom range often is not.
+   * A moving head sold as "8°–40° zoom" is usually quoting the 50% beam angle,
+   * and entering that here narrows the fixture by the beam:field ratio —
+   * roughly a third on a spot. Convert before transcribing, or the fixture
+   * covers less of the stage than the real one does.
+   *
+   * The stored photometry is at whatever angle it was measured or fitted at;
+   * `scaleZoom` derives the rest, conserving flux.
    */
   zoomMin?: number;
   zoomMax?: number;

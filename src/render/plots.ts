@@ -164,7 +164,7 @@ export function renderReportPlots(
 
   try {
     const models = modelIndex(FIXTURE_LIBRARY, project.customModels);
-    const prepared = prepareRig(project, models).fixtures;
+    const prepared = prepareRig(project, models);
     const plots: ReportPlot[] = [];
 
     for (const spec of specs(planAspectFor(project))) {

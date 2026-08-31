@@ -43,8 +43,7 @@ import {
 } from 'three';
 
 import { beamFootprint, fixtureFrame, DEG } from '../domain/geometry';
-import { fieldAngleOf } from '../domain/photometry/distribution';
-import type { PreparedFixture } from '../domain/rig';
+import type { PreparedRig } from '../domain/rig';
 import type { Grid, Project, Structure, Vec3 } from '../domain/types';
 import { buildHeatmapTexture, chooseScale, type Ramp } from './heatmap';
 
@@ -68,7 +67,7 @@ export interface SceneHandle {
   resize: (width: number, height: number) => void;
   setProject: (
     project: Project,
-    fixtures: PreparedFixture[],
+    rig: PreparedRig,
     selection: Set<string>,
     selectedStructureId: string | null,
   ) => void;
@@ -227,9 +226,9 @@ export function createScene(canvas: HTMLCanvasElement, setup: SceneSetup = {}): 
   };
 
   let currentProject: Project | null = null;
-  let currentFixtures: PreparedFixture[] = [];
+  let currentRig: PreparedRig = { fixtures: [], issues: [], fieldAngles: new Map() };
   let currentSelection = new Set<string>();
-  /** Bounding spheres for picking, in the order of `currentFixtures`. */
+  /** Bounding spheres for picking, in the order of `currentRig.fixtures`. */
   let pickTargets: Array<{ id: string; sphere: Sphere }> = [];
 
   // -------------------------------------------------------------------------
@@ -422,13 +421,13 @@ export function createScene(canvas: HTMLCanvasElement, setup: SceneSetup = {}): 
   // -------------------------------------------------------------------------
   // Fixtures, beams, footprints
   // -------------------------------------------------------------------------
-  function buildFixtures(project: Project, prepared: PreparedFixture[], selection: Set<string>): void {
+  function buildFixtures(project: Project, rig: PreparedRig, selection: Set<string>): void {
     clear(fixtureGroup);
     clear(beamGroup);
     clear(footprintGroup);
     pickTargets = [];
 
-    const preparedById = new Map(prepared.map((f) => [f.id, f]));
+    const preparedById = new Map(rig.fixtures.map((f) => [f.id, f]));
 
     for (const rigFixture of project.fixtures) {
       const selected = selection.has(rigFixture.id);
@@ -453,11 +452,16 @@ export function createScene(canvas: HTMLCanvasElement, setup: SceneSetup = {}): 
       const isolated = options.isolateSelection && selection.size > 0 && !selected;
       if (!rigFixture.enabled || isolated) continue;
 
-      const fieldAngle = prep
-        ? prep.photometry.kind === 'analytic'
-          ? fieldAngleOf(prep.photometry)
-          : (prep.maxGamma * 2) / 3
-        : 30;
+      // The cone and the footprint are the field angle — 10% of peak, the edge
+      // of the light — for measured fixtures as much as for analytic ones.
+      // This used to fall back to two thirds of `maxGamma` for a measured
+      // table, which is not a field angle at all: `maxGamma` is the last gamma
+      // carrying any light, so the fraction it lands on depends on how deep the
+      // fixture's tail runs. On an imported Source Four 36° it drew the cone
+      // several degrees narrow; on a cyc unit with real spill, wildly wide.
+      // `prepareRig` resolves the true 10% angle for every fixture, including
+      // the dark ones the solve drops.
+      const fieldAngle = prep?.fieldAngle ?? rig.fieldAngles.get(rigFixture.id) ?? 30;
 
       if (options.showBeams) {
         beamGroup.add(
@@ -774,14 +778,14 @@ export function createScene(canvas: HTMLCanvasElement, setup: SceneSetup = {}): 
       camera.updateProjectionMatrix();
     },
 
-    setProject: (project, fixtures, selection, structureId) => {
+    setProject: (project, rig, selection, structureId) => {
       currentProject = project;
-      currentFixtures = fixtures;
+      currentRig = rig;
       currentSelection = selection;
       selectedStructureId = structureId;
       buildStage(project);
       buildStructures(project, selectedStructureId);
-      buildFixtures(project, fixtures, selection);
+      buildFixtures(project, rig, selection);
       buildHeatmap(lastGrid, lastScaleMax, lastRamp);
     },
 
@@ -797,7 +801,7 @@ export function createScene(canvas: HTMLCanvasElement, setup: SceneSetup = {}): 
       if (currentProject) {
         buildStage(currentProject);
         buildStructures(currentProject, selectedStructureId);
-        buildFixtures(currentProject, currentFixtures, currentSelection);
+        buildFixtures(currentProject, currentRig, currentSelection);
         buildHeatmap(lastGrid, lastScaleMax, lastRamp);
       }
     },

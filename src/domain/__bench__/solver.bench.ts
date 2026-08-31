@@ -7,7 +7,7 @@ import { fixtureFrame, vec } from '../geometry';
 import { buildCosTable } from '../photometry/distribution';
 import { estimatePhotometrics } from '../photometry/estimator';
 import { parseIes } from '../photometry/ies';
-import { maxGammaOf, type PreparedFixture } from '../rig';
+import { fieldAngleOfPhotometry, maxGammaOf, type PreparedFixture } from '../rig';
 import { buildSampleField, solve } from '../solver';
 import type { MeasurementPlane, Photometry, Stage } from '../types';
 
@@ -58,6 +58,7 @@ function prepared(
     photometry,
     gain: 1,
     maxGamma: maxGammaOf(photometry),
+    fieldAngle: fieldAngleOfPhotometry(photometry),
     rotationallySymmetric: symmetric,
     // Mirrors what `prepareRig` does. Without it the benchmark would quietly
     // measure the un-accelerated path and report the wrong thing.

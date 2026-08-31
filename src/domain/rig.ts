@@ -18,6 +18,7 @@ import {
   sub,
 } from './geometry';
 import {
+  angleAtFraction,
   buildCosTable,
   fieldAngleOf,
   scaleZoom,
@@ -50,6 +51,12 @@ export interface PreparedFixture {
    * difference between a solve that keeps up with a drag and one that does not.
    */
   maxGamma: number;
+  /**
+   * Full angle in degrees at 10% of peak — the **field** angle, not the 50%
+   * beam angle. See `fieldAngleOfPhotometry` for why everything geometric in
+   * this app quotes the field.
+   */
+  fieldAngle: number;
   /** True when the distribution does not vary with C, so the solver skips atan2. */
   rotationallySymmetric: boolean;
   /**
@@ -74,6 +81,35 @@ export interface RigIssue {
 export interface PreparedRig {
   fixtures: PreparedFixture[];
   issues: RigIssue[];
+  /**
+   * Field angle of every fixture that resolved a model and an optic, keyed by
+   * fixture id — including the ones `fixtures` drops for being dark. The
+   * viewport still draws a cone for a fixture parked at zero, and it has to be
+   * the cone that fixture would actually throw rather than a nominal one.
+   */
+  fieldAngles: Map<string, number>;
+}
+
+/**
+ * Field angle of a distribution: the full angle at 10% of peak.
+ *
+ * Everything geometric in this app quotes the field angle, never the 50% beam
+ * angle. The beam angle describes the bright core; the field angle is where the
+ * light actually stops, so it is what a drawn cone, a footprint ring and
+ * "focus to cover" all have to mean. Butt two 26° *beam* angles edge to edge on
+ * a Source Four and you have left a seam the audience can see — the fixture's
+ * field is 34°, and the overlap that evens the wash lives entirely in the
+ * 26°–34° shoulder the beam angle throws away.
+ *
+ * Analytic distributions give it in closed form. For a measured table the
+ * importer already resolved it with `angleAtFraction(p, 0.1)` and stored it on
+ * the optic, so take that; walking the table again is only a fallback for a
+ * caller that has no stored figure.
+ */
+export function fieldAngleOfPhotometry(p: Photometry, stored?: number): number {
+  if (p.kind === 'analytic') return fieldAngleOf(p);
+  if (stored !== undefined && stored > 0) return stored;
+  return angleAtFraction(p, 0.1);
 }
 
 /** Every model the project can use: the built-in library plus its own customs. */
@@ -204,6 +240,7 @@ export function prepareRig(
   const structures = new Map(project.structures.map((s) => [s.id, s]));
   const fixtures: PreparedFixture[] = [];
   const issues: RigIssue[] = [];
+  const fieldAngles = new Map<string, number>();
   const loadByStructure = new Map<string, number>();
 
   for (const fixture of project.fixtures) {
@@ -245,6 +282,8 @@ export function prepareRig(
     const position = resolvePosition(fixture, structure);
     const direction = resolveDirection(fixture, position);
     const { photometry, zoomIsExact } = resolvePhotometry(optic, fixture);
+    const fieldAngle = fieldAngleOfPhotometry(photometry, optic.photometrics.fieldAngle);
+    fieldAngles.set(fixture.id, fieldAngle);
 
     if (!zoomIsExact) {
       issues.push({
@@ -271,6 +310,7 @@ export function prepareRig(
       photometry,
       gain,
       maxGamma: maxGammaOf(photometry),
+      fieldAngle,
       rotationallySymmetric: symmetric,
       ...(symmetric && photometry.kind === 'analytic'
         ? { cosTable: buildCosTable(photometry) }
@@ -289,7 +329,7 @@ export function prepareRig(
     }
   }
 
-  return { fixtures, issues };
+  return { fixtures, issues, fieldAngles };
 }
 
 /** Can this fixture physically point where it has been asked to point? */

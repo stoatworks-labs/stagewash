@@ -100,7 +100,7 @@ export function Viewport(): React.ReactElement {
   // --- push document changes into the scene --------------------------------
   const prepared = useMemo(() => {
     const models = modelIndex(FIXTURE_LIBRARY, project.customModels);
-    return prepareRig(project, models).fixtures;
+    return prepareRig(project, models);
   }, [project]);
 
   useEffect(() => {

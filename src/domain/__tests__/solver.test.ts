@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { fixtureFrame, sub, vec } from '../geometry';
 import { parseIes } from '../photometry/ies';
-import { maxGammaOf } from '../rig';
+import { fieldAngleOfPhotometry, maxGammaOf } from '../rig';
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 import { computeMetrics, findBlobs, footcandlesToLux, luxToFootcandles } from '../metrics';
@@ -62,6 +62,7 @@ function makeFixture(options: {
     maxGamma: photometrics.photometry.kind === 'analytic'
       ? photometrics.photometry.cutoffGamma
       : 180,
+    fieldAngle: fieldAngleOfPhotometry(photometrics.photometry, photometrics.fieldAngle),
     rotationallySymmetric: options.fieldAngleCross === undefined,
   };
 }
@@ -306,6 +307,7 @@ describe('solve', () => {
       photometry: ies,
       gain: 1,
       maxGamma: maxGammaOf(ies),
+      fieldAngle: fieldAngleOfPhotometry(ies),
       rotationallySymmetric: false,
     };
 
