@@ -1,4 +1,7 @@
-import { defineConfig, type Plugin } from 'vite';
+// vitest/config's defineConfig is Vite's with the `test` block typed; Vite's
+// own would reject the key below.
+import { defineConfig } from 'vitest/config';
+import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 import { readFileSync } from 'node:fs';
@@ -51,5 +54,21 @@ export default defineConfig({
     // The solver worker is an ES module (it imports from src/domain). Vite's
     // default worker format is 'iife', which cannot carry static imports.
     format: 'es',
+  },
+  test: {
+    benchmark: {
+      // vitest 5 warns when a benchmarked path reads a module export "too many
+      // times" through the getter its module runner puts on every cross-module
+      // import. The one it flags here is `sampleCosTable`, which `solve` calls
+      // once per sample point. That overhead is the same for every case, was
+      // there just as silently under vitest 4 (the AGENTS.md table was measured
+      // with it), and is not in the production bundle, where the import is a
+      // direct binding. The numbers compare cases and before/after; they were
+      // never absolutes, and seven copies of the warning per run only bury the
+      // tables they qualify. The tracker behind the warning costs more than the
+      // getters it counts, too: "18 analytic" ran at ~5,000 hz with it on and
+      // ~9,500 hz with it off, on the same machine in the same minute.
+      suppressExportGetterWarnings: true,
+    },
   },
 });

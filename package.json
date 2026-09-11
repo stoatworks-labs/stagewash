@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc -b",
     "deploy": "npm run build && npx wrangler deploy",
-    "bench": "vitest bench --run"
+    "bench": "vitest bench --run --reporter verbose"
   },
   "dependencies": {
     "jspdf": "^4.2.1",
@@ -33,7 +33,7 @@
     "oxlint": "^1.81.0",
     "typescript": "~7.0.2",
     "vite": "^8.2.2",
-    "vitest": "^4.1.11",
+    "vitest": "^5.0.0",
     "wrangler": "^4.129.0"
   },
   "overrides": {

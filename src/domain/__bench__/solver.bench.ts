@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bench, describe } from 'vitest';
+import { describe, test } from 'vitest';
 
 import { fixtureFrame, vec } from '../geometry';
 import { buildCosTable } from '../photometry/distribution';
@@ -15,6 +15,10 @@ import type { MeasurementPlane, Photometry, Stage } from '../types';
  * Solver benchmarks.
  *
  * `npm run bench`
+ *
+ * Each case is a `test()` that runs one benchmark through vitest 5's `bench`
+ * fixture — v5 removed the top-level `bench()` — and `benchmark()` below keeps
+ * the cases reading the way they always did.
  *
  * The shapes that matter are not "the default rig" — that is 18 fixtures on a
  * small stage and solves in about a millisecond however badly it is written.
@@ -31,6 +35,17 @@ import type { MeasurementPlane, Photometry, Stage } from '../types';
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * One benchmark case. vitest 5 hands `bench` to a test as a fixture and only
+ * reports what `.run()` returns, so every case is a test that runs exactly one
+ * benchmark and is named after it.
+ */
+function benchmark(name: string, fn: () => void): void {
+  test(name, async ({ bench }) => {
+    await bench(name, fn).run();
+  });
+}
 
 const BIG_STAGE: Stage = { widthM: 20, depthM: 12, heightM: 0 };
 const SMALL_STAGE: Stage = { widthM: 10, depthM: 6, heightM: 0 };
@@ -107,11 +122,11 @@ describe('coarse grid, small stage (the default rig’s shape)', () => {
   const analytic = rig(narrow, 18, SMALL_STAGE);
   const tabulated = rig(measured, 18, SMALL_STAGE);
 
-  bench('18 analytic', () => {
+  benchmark('18 analytic', () => {
     solve(analytic, field);
   });
 
-  bench('18 measured (tabulated)', () => {
+  benchmark('18 measured (tabulated)', () => {
     solve(tabulated, field);
   });
 });
@@ -122,15 +137,15 @@ describe('coarse grid, big stage, festival rig', () => {
   const wideRig = rig(wide, 120, BIG_STAGE);
   const measuredRig = rig(measured, 120, BIG_STAGE);
 
-  bench('120 narrow analytic', () => {
+  benchmark('120 narrow analytic', () => {
     solve(narrowRig, field);
   });
 
-  bench('120 wide analytic', () => {
+  benchmark('120 wide analytic', () => {
     solve(wideRig, field);
   });
 
-  bench('120 measured (tabulated)', () => {
+  benchmark('120 measured (tabulated)', () => {
     solve(measuredRig, field);
   });
 });
@@ -140,11 +155,11 @@ describe('fine grid (0.05 m), big stage', () => {
   const narrowRig = rig(narrow, 60, BIG_STAGE);
   const measuredRig = rig(measured, 60, BIG_STAGE);
 
-  bench('60 narrow analytic', () => {
+  benchmark('60 narrow analytic', () => {
     solve(narrowRig, field);
   });
 
-  bench('60 measured (tabulated)', () => {
+  benchmark('60 measured (tabulated)', () => {
     solve(measuredRig, field);
   });
 });
