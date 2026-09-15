@@ -17,6 +17,10 @@ coverage on the deck — before you get to the venue.
 A browser app. Nothing is installed, nothing is uploaded: the whole calculation runs in
 the tab.
 
+![stagewash's default rig: the fixtures over the stage, the illuminance plot on the deck and the fixture list beside it](docs/screenshots/stagewash.png)
+
+<sub>The default rig, captured headless from the live app: the truss and its fixtures drawn over the stage, the direct-illuminance plot on the deck, and the fixture list and controls either side.</sub>
+
 ---
 
 ## What it does
