@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="stagewash">
+  <rect width="32" height="32" rx="6" fill="#080d13"/>
+  <g id="mark">
+    <!-- A fixture and the pool it puts on the deck. -->
+    <path d="M13.6 9.4 7.4 23.9h17.2L18.4 9.4z" fill="#ffd479"/>
+    <rect x="12.5" y="4.3" width="7" height="5.2" rx="1.3" fill="#7fa8ce"/>
+    <path d="M5 26.6h22" stroke="#7fa8ce" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+</svg>
