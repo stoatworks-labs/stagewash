@@ -1,21 +1,17 @@
 # stagewash
 
 > **AI-assisted project.** This codebase was created with [Claude Code](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. The illuminance model is calibrated rather
-> than assumed: eight published photometric rows transcribed from ETC Source Four datasheets are
-> held as tests, and the estimator lands within about 10% given a manufacturer's own field lumens
-> and about 25% from bare lamp lumens alone. The importers are checked against real files — ETC's
-> entire published Source Four bundle, 132 LM-63-02 files, parses with no failures or warnings, and
-> EULUMDAT candela tables integrate back over the sphere to the lamp flux the file declares within
-> 0.1%. 141 tests in total. But this is a **direct illuminance** calculation only — no
-> inter-reflection, haze, shutter cuts, gobos or shadowing — and **nothing here has ever been
-> checked against a light meter on a real stage.**
+> (Anthropic), directed and reviewed by a human author. The illuminance model is calibrated
+> against published ETC Source Four data rather than assumed, the importers are checked against
+> real photometric files, and there are 141 tests in total; the numbers are further down. It's a
+> **direct illuminance** calculation only, though (no inter-reflection, haze, shutter cuts, gobos
+> or shadowing), and **nothing here has ever been checked against a light meter on a real stage.**
 
 Model a stage and a lighting rig, focus the fixtures, and see the light levels and
-coverage on the deck — before you get to the venue.
+coverage on the deck before you get to the venue rather than after.
 
-A browser app. Nothing is installed, nothing is uploaded: the whole calculation runs in
-the tab.
+It's a browser app. There's nothing to install and nothing gets uploaded: the whole
+calculation runs in the tab.
 
 ![stagewash's default rig: the fixtures over the stage, the illuminance plot on the deck and the fixture list beside it](docs/screenshots/stagewash.png)
 
@@ -44,15 +40,15 @@ the tab.
 
 Most of the value is in a single toggle.
 
-- **Horizontal** — illuminance on a surface parallel to the deck. The classic floor wash.
-- **Vertical** — illuminance on a surface facing the audience, at head height. What a
+- **Horizontal**: illuminance on a surface parallel to the deck. The classic floor wash.
+- **Vertical**: illuminance on a surface facing the audience, at head height. What a
   *face* receives.
 
 A rig can look perfectly even on the floor and be flat and shadowless on faces, because
 overhead light arrives nearly edge-on to a vertical surface and contributes almost
 nothing to it. Flip between the two and the ranking of your fixtures inverts: on the
-default rig the backlight contributes exactly **zero** to the face plane, and the
-front-of-house units more than double. That is the calculation catching the most common
+default rig the backlight contributes **zero** to the face plane, and the
+front-of-house units more than double. That's the calculation catching the most common
 mistake in a stage rig.
 
 ## Fixture data, and how much to trust it
@@ -60,17 +56,17 @@ mistake in a stage rig.
 Every fixture carries a badge saying where its numbers came from, because a lux figure
 computed from a guess is worth nothing and you have to be able to tell which is which.
 
-- **measured** — read from a manufacturer photometric file (`.ies` / `.ldt`) that you
+- **measured**: read from a manufacturer photometric file (`.ies` / `.ldt`) that you
   imported. As good as this gets. Do this when the answer has to be right.
-- **published** — the beam angle, field angle and centre-beam candela are transcribed
+- **published**: the beam angle, field angle and centre-beam candela are transcribed
   from a named manufacturer datasheet; only the roll-off between those anchors is
   modelled. The built-in ETC Source Four entries are these.
-- **estimated** — a generic archetype synthesised from lamp output and beam angle. Useful
+- **estimated**: a generic archetype synthesised from lamp output and beam angle. Useful
   for blocking out a rig, not for promising a level. Always named `Generic`.
 
 You can also build a custom fixture. If you have its centre-beam candela, or its lux at a
-stated distance, use that — it assumes nothing. Bare lamp lumens is the weakest option
-because it has to assume an optical efficiency, and real fixtures of the same class run
+stated distance, use that, because it assumes nothing. Bare lamp lumens is the weakest
+option because it has to assume an optical efficiency, and real fixtures of the same class run
 anywhere from 42% to 65%.
 
 **How accurate is the estimator?** Checked against eight published photometric rows from
@@ -78,18 +74,18 @@ ETC Source Four datasheets: within about 10% when given the manufacturer's own f
 lumens and angles, and within about 25% from bare lamp lumens alone. Those numbers are in
 the test suite, not marketing.
 
-**And the importer?** ETC's entire published Source Four photometric bundle — 132 real
-LM-63-02 files — parses with zero failures and zero warnings. The EULUMDAT reader is
+**And the importer?** ETC's entire published Source Four photometric bundle (132 real
+LM-63-02 files) parses with zero failures and zero warnings. The EULUMDAT reader is
 checked against real files covering every symmetry case the format defines, by
 integrating each candela table over the sphere and confirming it comes back to the lamp
-flux the file declares — within 0.1%, and on a LEDiL street optic it independently
-recovers that luminaire's own stated 88.63% light output ratio.
+flux the file declares, within 0.1%. On a LEDiL street optic it independently recovers
+that luminaire's own stated 88.63% light output ratio.
 
 Worth knowing what that exercise turned up: for four of eight fixtures ETC's own IES file
 and ETC's own datasheet agree to within 1%, and for the other four they differ by 5–15%,
 because the files and the sheets are different revisions. **±15% between two first-party
-sources for the same fixture is the real floor on accuracy in this business** — it is
-larger than anything the maths in here contributes.
+sources for the same fixture is the real floor on accuracy in this business.** It's
+bigger than anything the maths in here contributes.
 
 ## What is not modelled
 
@@ -98,7 +94,7 @@ fixture's intensity distribution.
 
 It does **not** model inter-reflection from the deck, walls or a cyc; atmospheric haze;
 shutter cuts, gobos or barn doors; or shadowing by people and scenery. On a dark stage
-that is the right model. In a white studio, inter-reflection can add a third again to
+that's the right model. In a white studio, inter-reflection can add a third again to
 these figures.
 
 Nothing here has been checked against a light meter on a real stage.
