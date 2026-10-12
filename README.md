@@ -3,7 +3,7 @@
 > **AI-assisted project.** This codebase was created with [Claude Code](https://claude.com/claude-code)
 > (Anthropic), directed and reviewed by a human author. The illuminance model is calibrated
 > against published ETC Source Four data rather than assumed, the importers are checked against
-> real photometric files, and there are 141 tests in total; the numbers are further down. It's a
+> real photometric files, and there are 147 tests in total; the numbers are further down. It's a
 > **direct illuminance** calculation only, though (no inter-reflection, haze, shutter cuts, gobos
 > or shadowing), and **nothing here has ever been checked against a light meter on a real stage.**
 

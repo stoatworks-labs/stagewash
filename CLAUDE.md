@@ -5,8 +5,8 @@ commands only.
 
 ```bash
 npm install
-npm run dev        # vite dev server, port 5199
-npm test           # vitest — 105 tests
+npm run dev        # vite dev server (port 5199 via .claude/launch.json)
+npm test           # vitest — 147 tests
 npm run bench      # vitest bench — solver performance
 npm run typecheck  # tsc -b (app + node + test projects)
 npm run lint       # oxlint
@@ -14,7 +14,8 @@ npm run build      # tsc -b && vite build -> dist/
 npm run deploy     # build + wrangler deploy  (Worker + static assets)
 ```
 
-Deploy needs the keychain token, not `wrangler login`:
+A push to main deploys through `.github/workflows/deploy.yml`. By hand, deploying needs the
+keychain token, not `wrangler login`:
 
 ```bash
 cf-run npx wrangler deploy

@@ -14,7 +14,7 @@ three.js for the wireframe plot, deployed to Cloudflare as a Worker that serves 
 assets. Everything runs client-side; there is no backend and there should never be one —
 the Worker exists only to serve `dist/`, not to run code.
 
-Private repo, MIT licence text in `LICENSE`.
+Public repo (since 2026-08-05), MIT licence text in `LICENSE`.
 
 The reference for the 3D view is **ArrayCalc's plot window**: an engineering diagram you
 can rotate, not a render. Photorealism is explicitly out of scope and would be worse — it
@@ -63,7 +63,7 @@ and would drift from the screen the first time either was touched.
 ```bash
 npm install
 npm run dev        # vite dev server (port 5199 via .claude/launch.json)
-npm test           # vitest — 105 tests
+npm test           # vitest — 147 tests
 npm run typecheck  # tsc -b across app + node + test configs
 npm run lint       # oxlint
 npm run build      # tsc -b && vite build -> dist/
@@ -382,7 +382,8 @@ Be straight about this in any report or release note.
 
 Repo conventions per the fleet: `CLAUDE.md` is the command reference, this file is the
 mental model. Deployment is a Cloudflare **Worker with static assets** (`wrangler.toml`
-`[assets]`), never Pages — the two config keys are not interchangeable. Deploy with
+`[assets]`), never Pages — the two config keys are not interchangeable. A push to main deploys
+through `.github/workflows/deploy.yml`. By hand, deploy with
 `cf-run npx wrangler deploy` so the keychain token is used; never `wrangler login`.
 
 ## Notes
