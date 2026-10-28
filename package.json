@@ -22,7 +22,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "three": "^0.186.1",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
@@ -30,11 +30,11 @@
     "@types/react-dom": "^19.3.0",
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "oxlint": "^1.88.0",
+    "oxlint": "^1.89.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.5",
-    "wrangler": "^4.151.1"
+    "wrangler": "^4.152.0"
   },
   "overrides": {
     "undici@7": "^7.30.1"
