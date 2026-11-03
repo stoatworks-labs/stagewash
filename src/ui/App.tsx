@@ -145,6 +145,14 @@ export function App(): React.ReactElement {
         <div className="brand">
           stagewash<span>coverage calculator</span>
         </div>
+        <a
+          className="brand-link"
+          href="https://stoatworks-labs.com/web-tools/stagewash/"
+          target="_blank"
+          rel="noopener"
+        >
+          About this tool
+        </a>
 
         <input
           type="text"

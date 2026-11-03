@@ -130,6 +130,13 @@ canvas.viewport {
   font-size: 11px;
 }
 
+/* The way back to the tool's page on stoatworks-labs.com. */
+.brand-link {
+  color: var(--text-faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .toolbar-group {
   display: flex;
   align-items: center;

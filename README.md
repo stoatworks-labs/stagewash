@@ -13,6 +13,11 @@ coverage on the deck before you get to the venue rather than after.
 It's a browser app. There's nothing to install and nothing gets uploaded: the whole
 calculation runs in the tab.
 
+It's live at [stagewash.stoatworks-labs.com](https://stagewash.stoatworks-labs.com). Its
+[page on Stoatworks Labs](https://stoatworks-labs.com/web-tools/stagewash/) covers running it on
+your own server, and the [project page](https://stoatworks-labs.com/software/stagewash/) has the
+user guide.
+
 ![stagewash's default rig: the fixtures over the stage, the illuminance plot on the deck and the fixture list beside it](docs/screenshots/stagewash.png)
 
 <sub>The default rig, captured headless from the live app: the truss and its fixtures drawn over the stage, the direct-illuminance plot on the deck, and the fixture list and controls either side.</sub>

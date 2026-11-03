@@ -4,10 +4,49 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>stagewash — stage lighting coverage calculator</title>
-    <meta
-      name="description"
-      content="Model a stage and lighting rig, focus the fixtures, and see the light levels and coverage on the deck before you get to the venue."
-    />
+    <meta name="description" content="Models a stage and a lighting rig and works out the illuminance on the deck, as a heatmap, before anyone gets to the venue. Free, and it runs in your browser." />
+    <link rel="canonical" href="https://stagewash.stoatworks-labs.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Stoatworks Labs" />
+    <meta property="og:title" content="stagewash — stage lighting coverage calculator" />
+    <meta property="og:description" content="Models a stage and a lighting rig and works out the illuminance on the deck, as a heatmap, before anyone gets to the venue. Free, and it runs in your browser." />
+    <meta property="og:url" content="https://stagewash.stoatworks-labs.com/" />
+    <meta property="og:image" content="https://stoatworks-labs.com/thumbs/stagewash.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="720" />
+    <meta property="og:image:alt" content="stagewash" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "@id": "https://stagewash.stoatworks-labs.com#app",
+        "name": "stagewash",
+        "url": "https://stagewash.stoatworks-labs.com",
+        "description": "Models a stage and a lighting rig and works out the illuminance on the deck, as a heatmap, before anyone gets to the venue. Free, and it runs in your browser.",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Any (runs in a web browser)",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "GBP"
+        },
+        "author": {
+          "@id": "https://stoatworks-labs.com/#organization",
+          "@type": "Organization",
+          "name": "Stoatworks Labs",
+          "url": "https://stoatworks-labs.com/"
+        },
+        "publisher": {
+          "@id": "https://stoatworks-labs.com/#organization"
+        },
+        "sameAs": [
+          "https://stoatworks-labs.com/web-tools/stagewash/",
+          "https://github.com/stoatworks-labs/stagewash"
+        ]
+      }
+    </script>
     <meta name="color-scheme" content="dark light" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -17,6 +56,18 @@
     <meta name="theme-color" content="#080d13" />
   </head>
   <body>
+    <noscript>
+      <h1>stagewash</h1>
+      <p>Models a stage and a lighting rig and works out the illuminance on the deck before anyone gets to the venue. Build the rig from truss, bars and stands, focus each fixture at a point on the stage and let it work out the pan and tilt, then read the levels off a heatmap with the beam cones drawn over it.</p>
+      <p>The bit worth having is one toggle between a horizontal plane and a vertical one. A rig can be perfectly even on the floor and still flat and shadowless on faces, because overhead light arrives nearly edge-on to a vertical surface, and flipping between the two turns the ranking of your fixtures upside down. Every fixture carries a badge saying whether its numbers were measured from an imported IES or EULUMDAT file, transcribed from a named datasheet, or synthesised from an archetype, so you always know which lux figures rest on a guess.</p>
+      <p>It needs JavaScript to run.</p>
+      <ul>
+        <li><a href="https://stoatworks-labs.com/web-tools/stagewash/">stagewash on Stoatworks Labs</a></li>
+        <li><a href="https://stoatworks-labs.com/software/stagewash/">Project page</a></li>
+        <li><a href="https://stoatworks-labs.com/software/stagewash/guide/">User guide</a></li>
+        <li><a href="https://github.com/stoatworks-labs/stagewash">Source code on GitHub</a></li>
+      </ul>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <!--

@@ -1,0 +1,17 @@
+# stagewash
+
+> Rig a stage, focus it, and read the levels off the deck
+
+Models a stage and a lighting rig and works out the illuminance on the deck before anyone gets to the venue. Build the rig from truss, bars and stands, focus each fixture at a point on the stage and let it work out the pan and tilt, then read the levels off a heatmap with the beam cones drawn over it.
+
+The bit worth having is one toggle between a horizontal plane and a vertical one. A rig can be perfectly even on the floor and still flat and shadowless on faces, because overhead light arrives nearly edge-on to a vertical surface, and flipping between the two turns the ranking of your fixtures upside down. Every fixture carries a badge saying whether its numbers were measured from an imported IES or EULUMDAT file, transcribed from a named datasheet, or synthesised from an archetype, so you always know which lux figures rest on a guess.
+
+It runs in the browser at https://stagewash.stoatworks-labs.com/ and is free to use.
+
+## Links
+
+- [stagewash on Stoatworks Labs](https://stoatworks-labs.com/web-tools/stagewash/): what it is, with links to everything else
+- [Project page](https://stoatworks-labs.com/software/stagewash/)
+- [User guide](https://stoatworks-labs.com/software/stagewash/guide/)
+- [Source code](https://github.com/stoatworks-labs/stagewash)
+- [Self-hosting](https://stoatworks-labs.com/web-tools/self-hosting/): running it on your own server
