@@ -96,3 +96,17 @@ invisible on a symmetric rig, hence the asymmetric downlight test.
 
 See [agents md convention](https://github.com/stoatworks-labs/fleet-notes/blob/main/notes/reference_agents_md_convention.md), [cloudflare access](https://github.com/stoatworks-labs/fleet-notes/blob/main/notes/reference_cloudflare_access.md),
 [arraycad](https://github.com/stoatworks-labs/arraycad/blob/main/docs/NOTES.md) (`arraycad`) (the 3D plot idiom came from ArrayCalc's plot window).
+
+**MVR import and export (2026-11-14).** Toolbar buttons, `src/domain/mvr/`, and the import
+dialog in `ui/MvrImportDialog.tsx`; AGENTS.md §6c has the detail. The decisions worth not
+re-litigating:
+- **No name matching.** An MVR has no photometry. Each type is mapped by the user to a
+  library or custom model, to an `estimated` model built from the GDTF Beam, or left out.
+- **GDTF Beam defaults (25°/25°/10,000 lm) are placeholders, and they are refused.**
+  Vectorworks' generic pendant carries exactly those. Capture's GDTFs have no Beam at all.
+- **The matrix is columns, beam along local −Z.** The spec only gives the order. Capture's
+  towers prove the reading.
+- **No GDTF is written on export.** Receivers map unknown types anyway. Everything MVR
+  can't hold goes in a `stagewash` UserData block, which round-trips the solve exactly.
+- **Not verified:** never opened in Vectorworks, Capture or MA3. The real-file tests are
+  files those apps wrote, read by us, and pymvr read our export.

@@ -6,7 +6,7 @@ commands only.
 ```bash
 npm install
 npm run dev        # vite dev server (port 5199 via .claude/launch.json)
-npm test           # vitest — 147 tests
+npm test           # vitest — 190 tests
 npm run bench      # vitest bench — solver performance
 npm run typecheck  # tsc -b (app + node + test projects)
 npm run lint       # oxlint

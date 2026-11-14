@@ -60,6 +60,56 @@ one number for the whole stage.
 
 ---
 
+## Bringing a rig in from MVR, and sending one out
+
+**MVR** (My Virtual Rig) is the scene format Vectorworks, Capture, grandMA3, Depence and most
+other lighting software use to pass a rig between them. stagewash reads and writes it.
+
+### Import MVR
+
+**An MVR file places fixtures, but it carries no photometry.** Each fixture names a type (a GDTF
+file), and a GDTF at best gives a beam angle, a field angle and a flux. So the import dialog lists
+every fixture type in the file and asks what each one is:
+
+- **A fixture from the library**, or one you imported from an IES file. This is the right answer
+  when the answer has to be right.
+- **Estimate from its GDTF beam**, offered only when the file has real figures. The result is
+  badged **estimated**, because a GDTF beam is a description of a device, not a measurement.
+- **Leave out.** Those fixtures don't come in, and you're told how many were left out.
+
+Some files will offer no estimate. Capture writes GDTFs with no beam at all, and many files
+carry the GDTF format's own placeholder beam (25° beam, 25° field, 10,000 lm). stagewash says so
+rather than using those numbers. **It never matches a fixture type by guessing from its name.**
+
+Fixtures keep their positions and, when the file has focus points, their aims. stagewash hangs
+every fixture on a structure, so each hanging position (or truss, or group) becomes one or more
+straight bars through its fixtures.
+
+A drawing's origin is often not the downstage edge centre. **The dialog shows where the rig sits
+against the stage and warns you if it misses.** One button centres the focus points (or the rig)
+on the stage, or you can move it by hand.
+
+**Importing replaces the current rig. Undo brings it back.**
+
+### Export MVR
+
+This writes the rig as an MVR scene:
+
+- each bar or truss as a hanging position;
+- each fixture at its position with its channel as the fixture ID;
+- a focus point wherever a fixture is aimed.
+
+**No GDTF files go with it.** The other application asks you to match each type to a fixture in
+its own library, which is what you'd do anyway.
+
+Everything MVR has no place for (the fixture models, zoom, levels, gels, your own imported
+photometry, the stage and the measurement plane) travels inside the file as stagewash data.
+**Import that file back and the dialog offers to restore all of it exactly.** Other software may
+drop that data when it saves. If it does, the positions and focus still come back, and you choose
+the fixture types again.
+
+---
+
 ## How much to trust a fixture's numbers
 
 Every fixture carries a **badge saying where its numbers came from**, because a lux figure computed
@@ -120,3 +170,5 @@ the raw grid.
 | **A studio reads darker than it looks** | Inter-reflection is not modelled, and can add a third again in a white room. |
 | **A fixture is badged `estimated`** | Its numbers are synthesised. Import a photometric file when the answer has to be right. |
 | **A focus is refused** | The moving head cannot reach it within its pan/tilt range. |
+| **An imported rig lights nothing** | The drawing uses a different origin. Centre it in the import dialog, or move it by hand. |
+| **An MVR type offers no GDTF estimate** | Its GDTF has no beam, or only the format's placeholder figures. Choose a fixture for it instead. |

@@ -262,7 +262,9 @@ export const useStore = create<StoreState>((set, get) => {
       const stamp = Date.now().toString(36);
       const copies = project.fixtures
         .filter((f) => ids.has(f.id))
-        .map((f, i) => ({
+        .map(({ mvrUuid: _imported, ...f }, i) => ({
+          // A copy is a new object: it must not carry the original's MVR UUID,
+          // or an export would hand the receiver two fixtures with one ID.
           ...f,
           id: `${f.id}-copy-${stamp}-${i}`,
           channel: `${f.channel}'`,

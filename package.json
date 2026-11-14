@@ -17,6 +17,7 @@
     "bench": "vitest bench --run --reporter verbose"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.9",
     "react": "^19.3.1",

@@ -3,7 +3,7 @@
 > **AI-assisted project.** This codebase was created with [Claude Code](https://claude.com/claude-code)
 > (Anthropic), directed and reviewed by a human author. The illuminance model is calibrated
 > against published ETC Source Four data rather than assumed, the importers are checked against
-> real photometric files, and there are 147 tests in total; the numbers are further down. It's a
+> real photometric files, and there are 190 tests in total; the numbers are further down. It's a
 > **direct illuminance** calculation only, though (no inter-reflection, haze, shutter cuts, gobos
 > or shadowing), and **nothing here has ever been checked against a light meter on a real stage.**
 
@@ -40,6 +40,11 @@ user guide.
   same model: the heatmap in plan with a colour key, an isometric of the rig and its
   beams, and a wireframe layout by channel that shares the plan's frame, so a pool on the
   map sits over the fixture that made it. CSV of the schedule and of the raw grid.
+- **Swap rigs with other software.** Import and export MVR, the scene format Vectorworks,
+  Capture, grandMA3 and others share. An MVR carries no photometry, so on import you say what
+  each fixture type is: a library fixture, your own IES file, or an `estimated` stand-in built
+  from its GDTF beam figures when they are real. Placeholder figures are refused, and nothing is
+  matched by guessing at names. An export round-trips through stagewash exactly.
 
 ## The two planes, which is the point
 

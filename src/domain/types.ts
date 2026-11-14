@@ -279,6 +279,12 @@ export interface Structure {
   /** Stands only: manufacturer's maximum working height, metres. */
   maxHeightM?: number;
   colour?: string;
+  /**
+   * UUID of the MVR hanging position this structure was imported from, kept
+   * so a re-export hands the receiver back the same object rather than a new
+   * one. Absent for anything built in stagewash.
+   */
+  mvrUuid?: string;
 }
 
 export type FocusMode = 'aim' | 'angles';
@@ -319,6 +325,8 @@ export interface RigFixture {
   transmission: number;
   gelName?: string;
   enabled: boolean;
+  /** UUID of the MVR fixture this was imported from; see `Structure.mvrUuid`. */
+  mvrUuid?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -35,6 +35,15 @@ src/
     rig.ts           Document -> solvable fixtures, plus every rig check
     solver.ts        THE IMPORTANT FILE — the illuminance grid solve
     metrics.ts       Statistics, uniformity, hot/dark blob finding, units
+    mvr/             MVR import and export (see §6c)
+      xml.ts           A small XML reader — real MVR files are not all well-formed
+      matrix.ts        MVR's 4x3 matrix: columns, millimetres, Z-up
+      scene.ts         GeneralSceneDescription.xml -> fixtures, focus points, positions
+      gdtf.ts          The Beam out of a GDTF, and whether it is real or placeholder
+      archive.ts       The zip (fflate); reads only the scene and the GDTFs
+      importRig.ts     MVR -> stagewash rig: type mapping, runs, focus
+      exportRig.ts     stagewash rig -> MVR, plus the UserData round-trip block
+      uuid.ts, glb.ts  Deterministic UUID v5; the box a truss is drawn as
   data/          The library. Every entry carries provenance + a named source.
   state/         zustand store, the default rig, the solver client
   workers/       The solve, off the main thread
@@ -63,7 +72,7 @@ and would drift from the screen the first time either was touched.
 ```bash
 npm install
 npm run dev        # vite dev server (port 5199 via .claude/launch.json)
-npm test           # vitest — 147 tests
+npm test           # vitest — 190 tests
 npm run typecheck  # tsc -b across app + node + test configs
 npm run lint       # oxlint
 npm run build      # tsc -b && vite build -> dist/
@@ -293,6 +302,83 @@ brute-force reference that visits every cell, on the geometry where culling actu
 covering everything, both plane orientations, and a measured distribution. Shrinking the
 window padding makes those tests fail, which is how you know they are load-bearing.
 
+## 6c. MVR import and export
+
+`src/domain/mvr/`, tested by `mvr.test.ts` (the pieces, export, and both round trips) and
+`mvrReal.test.ts` (three real files written by other applications: Vectorworks, Capture
+and BlenderDMX, from the MIT test corpus of `open-stage/python-mvr`). The UI is
+`ui/MvrImportDialog.tsx`, plus two toolbar buttons in `App.tsx`. Both modules are
+imported dynamically, so fflate stays out of the first load.
+
+**An MVR carries no photometry, and that sets the whole design.** Each fixture type is
+mapped once, by the user, to one of three things: a library or custom model; an estimate
+from the GDTF's Beam figures, which is badged `estimated` and goes through
+`estimatePhotometrics` like any other estimate; or nothing, and those fixtures are left
+out with a note. **Nothing is matched by name.** "Source Four 36" in a GDTF name
+proves nothing about which optic, lamp or revision it is. A wrong guess wearing a
+`published` badge is exactly what §5 forbids.
+
+What the real files showed, in the order it cost time:
+
+- **The matrix is columns.** `{u}{v}{w}{o}` are the images of the local X, Y and Z axes,
+  in millimetres. The spec gives only the order, not the reading. In the Capture file the
+  ten tower fixtures all point in toward the centre line under the column reading, and all
+  point out into the wings under the row reading. The eight ADB cyc units point upstage
+  and up at a backdrop. `mvrReal.test.ts` pins both.
+- **The beam is local −Z.** GDTF draws every fixture hanging, beam down, so the identity
+  matrix is a downlight. Export builds the rotation from the beam (`beamTransform`), with
+  u along the fixture frame's C=0 axis, so roll survives the round trip.
+- **GDTF Beam defaults are placeholders, not data.** The spec defaults are 25° beam, 25°
+  field, 10,000 lm, 1,000 W. The Vectorworks file's "Pendant 44deg" carries exactly
+  those. Any beam whose angles and flux all equal the defaults is flagged `placeholder`
+  and never offered as an estimate.
+- **Capture writes stub GDTFs with no Beam geometry at all.** They say nothing about the
+  light, and the dialog says so.
+- **Vectorworks writes `GDTFSpec` without the `.gdtf` extension.** Hence `findGdtf`'s
+  fallbacks.
+- **The MVR spec's own example XML uses `<!-->…</!-->` pseudo-comments**, which a strict
+  XML parser rejects, and a file built by copying the spec carries them. That is one
+  reason for a hand-written reader rather than `DOMParser`. The other is that `DOMParser`
+  isn't available in the Node tests.
+- **UUIDs come in upper case (Vectorworks), lower case (Capture), and as space-separated
+  bytes (the spec's own example).** `normaliseUuid` everything before using it as a key,
+  or a fixture loses its focus point.
+- **Capture's rotation columns are 1.00000095 long.** Normalise the body axis before
+  comparing a direction to it.
+
+**Structure inference.** `resolvePosition` re-derives every fixture's position from its
+structure on every commit, so an imported fixture has to sit on a run through it or it
+moves. Fixtures are grouped by `AUXData` Position, else by the nearest container (Truss,
+GroupObject), else by layer. Each group is then split into straight runs (`splitIntoRuns`):
+a whole-line PCA fit first, then the best pair-line by inlier count, then singletons,
+with a 5 cm tolerance. Measured snap: Vectorworks 3e-15 m, Capture at most 0.8 cm. The
+import notes a snap over 5 mm.
+
+**The position imported is the insertion point** (the clamp), not the lens. That is the
+same simplification a fixture hung by hand already makes. Moving it to the lens would
+also make it drift by the clamp-to-lens offset on every round trip through another tool.
+
+**Moving heads export their base, never a tilted body.** The matrix is hung (identity) or
+standing (Rx 180°), and where the head points goes out as a FocusPoint. Pan and tilt are
+a state, not a mounting, and a receiver that animates the head from a tilted base would
+double the tilt.
+
+**Round trip.** Everything MVR has no slot for goes in `UserData/Data provider="stagewash"`
+as JSON in CDATA: model and optic, zoom, level, gel, focus mode, roll, the structures, the
+stage, the plane, the targets, and any custom models the fixtures use. It is keyed by MVR
+UUID, and UUIDs are UUID v5 of the stagewash id, so a re-export hands back the same objects.
+An imported fixture keeps its `mvrUuid`, and `duplicateSelected` strips it from copies.
+`mvr.test.ts` pins the solve grid equal within 1e-6 after a round trip with the UserData,
+and positions, directions and roll preserved with it stripped. The spec warns that other
+tools may drop user data, so the importer never depends on it.
+
+**No GDTF is written on export.** stagewash's models are photometric, not device
+descriptions, and an invented GDTF that a strict receiver rejects is worse than none.
+Every receiver handles a missing type by asking the user to map it, which is what a
+designer does anyway. A truss goes out as a box GLB (`glb.ts`), which the Khronos
+glTF validator passes with no errors and no warnings. The whole export was read back by
+pymvr 1.0.7 with fixture positions, aims, hanging positions and trusses intact.
+
 ## 7. Traps that already cost time
 
 - **A measured table's cutoff is its last *live* row, not its last measured row.**
@@ -373,6 +459,11 @@ Be straight about this in any report or release note.
   of its white output; use the fixture's transmission control to account for it.
 - **Structural loading counts fixture weight only** — no clamps, cable, or the truss
   itself — and is a sanity check, not an engineering calculation.
+- **No stagewash MVR has been opened in Vectorworks, Capture or grandMA3.** The reader is
+  tested against files those applications wrote (§6c), and the export has been read back
+  by pymvr, an independent implementation. Nobody has loaded one into the real
+  applications. MVR also has no slot for zoom, so a zoom fixture comes in at its model's
+  default zoom unless the file carries stagewash's own data.
 - **The report's plots have never been printed.** They were checked as generated PDFs on
   screen, at several rig shapes. They are dark-background pictures, deliberately, so that
   they match what the app shows — which is a lot of toner, and the 5 pt channel labels on

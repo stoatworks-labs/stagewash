@@ -49,3 +49,28 @@ assignment and, above all, the symmetry expansion, since mirroring the wrong
 planes changes the integral. It lands within 0.1% on every file whose luminaire
 emits all of its lamp's light, and on `ldt-isym0-lor-88pct.ldt` it independently
 recovers that luminaire's own stated 88.63% output ratio.
+
+## MVR (`.mvr`)
+
+Three files from the test corpus of
+[`open-stage/python-mvr`](https://github.com/open-stage/python-mvr) (MIT), an
+independent MVR implementation, each written by a different application. See
+`mvrReal.test.ts`.
+
+| file | written by | why this one |
+|---|---|---|
+| `mvr-blenderdmx-basic-fixture.mvr` | BlenderDMX | One fixture with a GDTF that has real beam figures (60° beam, 90° field, 7,000 lm LED): the estimate path end to end |
+| `mvr-capture-demo-show-trimmed.mvr` | Capture | 76 fixtures in five types and no focus points. Its towers and floor units are the evidence that MVR's matrix is columns. Its GDTFs are stubs with no beam |
+| `mvr-vectorworks-scene-objects-trimmed.mvr` | Vectorworks | 72 fixtures, each with a focus point. `GDTFSpec` has no `.gdtf` extension, and the GDTF beam is the format's placeholder defaults |
+
+The BlenderDMX file is unchanged (24 kB). The other two are **trimmed**:
+`GeneralSceneDescription.xml` and every `.gdtf` are kept byte for byte, and the 3D
+models, which stagewash never reads, are dropped. That is 891 `.3ds` meshes from the
+Capture file (2.7 MB to 90 kB), and 100 `.glb` meshes plus 3 `.png` textures from the
+Vectorworks one (584 kB to 43 kB). Upstream names and SHA-256 of the originals:
+
+| file | upstream name | original SHA-256 |
+|---|---|---|
+| `mvr-blenderdmx-basic-fixture.mvr` | `basic_fixture.mvr` | `f78f6dcb7df1ed22c263577ae1a398e4ec3b2b2886bf2d964bd964d72e498549` (unchanged) |
+| `mvr-capture-demo-show-trimmed.mvr` | `capture_demo_show.mvr` | `53b9e2baae20290362c2b40cadf65eed5d7004483c678f90aea21d67125ee3bd` |
+| `mvr-vectorworks-scene-objects-trimmed.mvr` | `scene_objects.mvr` | `c1dba464dc6b6d29c3f5e5adc96a889ac82c651c462a92d7cd14c59af58d57ee` |

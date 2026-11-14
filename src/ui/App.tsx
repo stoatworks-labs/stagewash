@@ -2,7 +2,7 @@
  * The shell: toolbar, three panes, and the metrics strip along the bottom.
  */
 
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 
 import { formatLevel, unitLabel } from '../domain/metrics';
 import {
@@ -11,17 +11,29 @@ import {
   download,
   safeFilename,
 } from '../export/common';
+import type { MvrDocument } from '../domain/mvr/importRig';
+import { modelIndex } from '../domain/rig';
 import type { Project } from '../domain/types';
+import { FIXTURE_LIBRARY } from '../data/fixtures';
 import { useStore } from '../state/store';
 import { InspectorPanel } from './InspectorPanel';
 import { LibraryDialog } from './LibraryDialog';
 import { RigPanel } from './RigPanel';
 import { Viewport } from './Viewport';
 
+// Lazy, so the dialog, the MVR reader and the zip library it pulls in stay out
+// of the first load. A static import here would drag all three into the main
+// chunk however dynamically `importMvr` loads the reader.
+const MvrImportDialog = lazy(() =>
+  import('./MvrImportDialog').then((m) => ({ default: m.MvrImportDialog })),
+);
+
 export function App(): React.ReactElement {
   const [adding, setAdding] = useState(false);
   const [buildingPdf, setBuildingPdf] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string[] | null>(null);
+  const [mvr, setMvr] = useState<{ doc: MvrDocument; fileName: string } | null>(null);
   const project = useStore((s) => s.project);
   const unit = useStore((s) => s.unit);
   const setUnit = useStore((s) => s.setUnit);
@@ -139,6 +151,45 @@ export function App(): React.ReactElement {
     });
   };
 
+  const importMvr = (file: File | undefined): void => {
+    if (!file) return;
+    setOpenError(null);
+    setNotice(null);
+    void (async () => {
+      try {
+        // Dynamic, like the PDF: the zip reader and the MVR code are only
+        // wanted by someone who has an MVR file to hand.
+        const [{ readMvr }, bytes] = await Promise.all([
+          import('../domain/mvr/importRig'),
+          file.arrayBuffer(),
+        ]);
+        setMvr({ doc: readMvr(new Uint8Array(bytes)), fileName: file.name });
+      } catch (cause) {
+        setOpenError(
+          `Could not import ${file.name} — ${cause instanceof Error ? cause.message : String(cause)}`,
+        );
+      }
+    })();
+  };
+
+  const exportMvrFile = async (): Promise<void> => {
+    const { exportMvr } = await import('../domain/mvr/exportRig');
+    const { bytes, skipped } = exportMvr(
+      project,
+      modelIndex(FIXTURE_LIBRARY, project.customModels),
+      __APP_VERSION__,
+    );
+    download(
+      `${safeFilename(project.name)}.mvr`,
+      new Blob([bytes as BlobPart], { type: 'application/octet-stream' }),
+    );
+    setNotice(
+      skipped.length > 0
+        ? [`Exported ${project.fixtures.length - skipped.length} of ${project.fixtures.length} fixtures.`, ...skipped]
+        : null,
+    );
+  };
+
   return (
     <div className="app">
       <div className="toolbar">
@@ -210,6 +261,31 @@ export function App(): React.ReactElement {
         </div>
 
         <div className="toolbar-group">
+          <label className="button-like">
+            <button
+              onClick={() => document.getElementById('import-mvr')?.click()}
+              title="Bring in a rig from Vectorworks, Capture, grandMA3 or anything else that writes MVR"
+            >
+              Import MVR
+            </button>
+            <input
+              id="import-mvr"
+              type="file"
+              accept=".mvr"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                importMvr(e.target.files?.[0]);
+                // Let the same file be chosen again after a cancelled dialog.
+                e.target.value = '';
+              }}
+            />
+          </label>
+          <button onClick={() => void exportMvrFile()} title="Save the rig as an MVR scene for other lighting software">
+            Export MVR
+          </button>
+        </div>
+
+        <div className="toolbar-group">
           <button onClick={() => void exportPdf()} disabled={!solveState.grid || buildingPdf}>
             {buildingPdf ? 'Building…' : 'PDF report'}
           </button>
@@ -239,6 +315,17 @@ export function App(): React.ReactElement {
         </div>
       )}
 
+      {notice && (
+        <div className="warn-box" style={{ margin: '8px 12px' }}>
+          {notice.map((line, i) => (
+            <div key={i}>{line}</div>
+          ))}
+          <button onClick={() => setNotice(null)} style={{ marginTop: 6 }}>
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="workspace">
         <RigPanel />
         <Viewport />
@@ -248,6 +335,20 @@ export function App(): React.ReactElement {
       <MetricsStrip />
 
       {adding && <LibraryDialog onClose={() => setAdding(false)} />}
+
+      {mvr && (
+        <Suspense fallback={null}>
+          <MvrImportDialog
+            doc={mvr.doc}
+            fileName={mvr.fileName}
+            onClose={() => setMvr(null)}
+            onImported={(notes) => {
+              setMvr(null);
+              setNotice(notes.length > 0 ? notes : null);
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
