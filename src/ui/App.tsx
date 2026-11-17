@@ -192,9 +192,10 @@ export function App(): React.ReactElement {
 
   return (
     <div className="app">
-      <div className="toolbar">
-        <div className="brand">
-          stagewash<span>coverage calculator</span>
+      <div className="toolbar sw-bar">
+        <div className="brand sw-brand">
+          <span className="sw-mark" aria-hidden="true">✺</span> stagewash
+          <span className="brand-sub">coverage calculator</span>
         </div>
         <a
           className="brand-link"
@@ -299,7 +300,7 @@ export function App(): React.ReactElement {
 
         {/* Opens the shared About dialog — see public/about.js, which delegates
             this attribute from the document, so nothing needs importing here. */}
-        <div className="toolbar-group">
+        <div className="toolbar-group toolbar-about">
           <button type="button" data-stoatworks-about>
             About
           </button>

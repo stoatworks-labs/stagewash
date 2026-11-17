@@ -3,29 +3,45 @@
  *
  * Hairline borders, flat surfaces, no shadows, mono for anything numeric. The
  * brief asked for wireframes for speed, and it suits the job: this is an
- * instrument, and an instrument should not compete with the data on it. The
- * palette is the Stoatworks navy set, dark by default because a lighting tool
- * is used in the dark and because a heatmap needs a dark ground to read.
+ * instrument, and an instrument should not compete with the data on it.
+ *
+ * Colours come from the shared Stoatworks theme (stoatworks-theme.css, imported
+ * first), so the panes follow the system's light or dark setting. The viewport
+ * and its overlays stay dark on the stage in both modes, because a heatmap
+ * needs a dark ground to read.
  */
 
 :root {
-  --navy: #0e2942;
-  --ink: #080d13;
-  --panel: #0d1620;
-  --panel-2: #111d29;
-  --line: #1e3145;
-  --line-soft: #172636;
-  --text: #d6e2ee;
-  --text-dim: #8fa3b7;
-  --text-faint: #5d7286;
-  --accent: #7fa8ce;
+  --ink: var(--sw-paper);
+  --panel: var(--sw-card);
+  --panel-2: var(--sw-tint);
+  --line: var(--sw-line);
+  --line-soft: color-mix(in srgb, var(--sw-line) 60%, transparent);
+  --text: var(--sw-ink);
+  --text-dim: var(--sw-muted);
+  --text-faint: var(--sw-faint);
+  --accent: var(--sw-accent);
+  --danger: var(--sw-bad);
+  --ok: var(--sw-ok);
+  --mono: var(--sw-mono);
+  --sans: var(--sw-font);
+  /* A selected row or item: the accent, washed into the card. */
+  --selected: color-mix(in srgb, var(--sw-accent) 16%, var(--sw-card));
+  /* The warm yellow is the viewport's selection colour, so the rig tree and the
+     estimated badge keep its hue: a deep amber that reads on paper, the original
+     yellow on the dark ground. */
+  --accent-warm: #8a6100;
+  /* On the stage, the same light-on-dark values in both modes. */
+  --stage-dim: color-mix(in srgb, var(--sw-stage-ink) 70%, transparent);
+  --stage-faint: color-mix(in srgb, var(--sw-stage-ink) 50%, transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --accent-warm: #ffd479;
+  }
+}
+:root[data-theme="dark"] {
   --accent-warm: #ffd479;
-  --danger: #e2725b;
-  --ok: #6fbf8b;
-  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
-  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-
-  color-scheme: dark;
 }
 
 * {
@@ -89,7 +105,8 @@ body {
 .viewport-wrap {
   position: relative;
   min-height: 0;
-  background: var(--ink);
+  background: var(--sw-stage);
+  color: var(--sw-stage-ink);
 }
 
 canvas.viewport {
@@ -103,36 +120,22 @@ canvas.viewport {
 /* Toolbar                                                                */
 /* --------------------------------------------------------------------- */
 
+/* The navy bar (sw-bar): name, project, actions and About along one row. */
 .toolbar {
-  display: flex;
-  align-items: center;
   gap: 14px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel-2);
-  flex-wrap: wrap;
 }
 
-.brand {
-  font-family: var(--mono);
-  font-size: 13px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--accent);
-  white-space: nowrap;
-}
-
-.brand span {
-  color: var(--text-faint);
-  letter-spacing: 0.06em;
-  text-transform: none;
-  margin-left: 8px;
-  font-size: 11px;
+.brand .brand-sub {
+  color: var(--sw-navy-ink-2);
+  font-weight: 400;
+  letter-spacing: 0;
+  font-size: 12px;
 }
 
 /* The way back to the tool's page on stoatworks-labs.com. */
 .brand-link {
-  color: var(--text-faint);
+  color: var(--sw-navy-ink-2);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -147,6 +150,12 @@ canvas.viewport {
   flex: 1;
 }
 
+/* The toolbar wraps on narrower windows; About stays at the right-hand end of
+   whichever row it lands on. */
+.toolbar-about {
+  margin-left: auto;
+}
+
 /* --------------------------------------------------------------------- */
 /* Controls                                                               */
 /* --------------------------------------------------------------------- */
@@ -155,15 +164,15 @@ button {
   font: inherit;
   font-size: 12px;
   color: var(--text);
-  background: transparent;
+  background: var(--panel);
   border: 1px solid var(--line);
+  border-radius: var(--sw-radius-sm);
   padding: 4px 9px;
   cursor: pointer;
   transition: background 90ms linear, border-color 90ms linear;
 }
 
 button:hover:not(:disabled) {
-  background: var(--panel-2);
   border-color: var(--accent);
 }
 
@@ -174,14 +183,20 @@ button:disabled {
 }
 
 button.active {
-  background: var(--navy);
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--sw-on-accent);
 }
 
 button.primary {
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--sw-on-accent);
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 
 button.danger:hover:not(:disabled) {
@@ -201,8 +216,9 @@ select {
   font-size: 12px;
   font-family: var(--mono);
   color: var(--text);
-  background: var(--ink);
+  background: var(--panel);
   border: 1px solid var(--line);
+  border-radius: var(--sw-radius-sm);
   padding: 3px 6px;
   width: 100%;
   min-width: 0;
@@ -247,11 +263,9 @@ label {
   justify-content: space-between;
   gap: 8px;
   padding: 7px 10px;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
   background: var(--panel-2);
   cursor: pointer;
   user-select: none;
@@ -312,7 +326,7 @@ label {
 }
 
 .tree-structure.selected {
-  background: var(--navy);
+  background: var(--selected);
   color: var(--accent-warm);
 }
 
@@ -337,7 +351,7 @@ label {
 }
 
 .tree-fixture.selected {
-  background: var(--navy);
+  background: var(--selected);
   color: var(--accent-warm);
 }
 
@@ -416,8 +430,9 @@ label {
   position: absolute;
   left: 12px;
   bottom: 12px;
-  background: rgba(8, 13, 19, 0.86);
-  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--sw-stage) 86%, transparent);
+  border: 1px solid var(--sw-stage-line);
+  border-radius: var(--sw-radius-sm);
   padding: 8px 10px;
   pointer-events: none;
 }
@@ -426,7 +441,7 @@ label {
   display: flex;
   height: 10px;
   width: 190px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--sw-stage-line);
 }
 
 .legend-bar div {
@@ -438,8 +453,12 @@ label {
   justify-content: space-between;
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--text-dim);
+  color: var(--stage-dim);
   margin-top: 3px;
+}
+
+.legend .faint {
+  color: var(--stage-faint);
 }
 
 .viewport-badge {
@@ -451,9 +470,10 @@ label {
   align-items: center;
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--text-faint);
-  background: rgba(8, 13, 19, 0.86);
-  border: 1px solid var(--line);
+  color: var(--stage-dim);
+  background: color-mix(in srgb, var(--sw-stage) 86%, transparent);
+  border: 1px solid var(--sw-stage-line);
+  border-radius: var(--sw-radius-sm);
   padding: 4px 8px;
   pointer-events: none;
 }
@@ -464,7 +484,7 @@ label {
   top: 12px;
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--text-faint);
+  color: var(--stage-faint);
   pointer-events: none;
 }
 
@@ -568,7 +588,7 @@ td.num {
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4, 8, 12, 0.7);
+  background: rgba(6, 14, 22, 0.6);
   display: grid;
   place-items: center;
   z-index: 20;
@@ -578,6 +598,8 @@ td.num {
 .dialog {
   background: var(--panel);
   border: 1px solid var(--line);
+  border-radius: var(--sw-radius);
+  overflow: hidden;
   width: min(760px, 100%);
   max-height: 86vh;
   display: flex;
@@ -592,11 +614,13 @@ td.num {
   padding: 10px 14px;
   border-bottom: 1px solid var(--line);
   background: var(--panel-2);
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.dialog-head .faint {
+  font-weight: 400;
 }
 
 .dialog-body {
@@ -622,6 +646,7 @@ td.num {
   align-items: center;
   padding: 7px 9px;
   border: 1px solid var(--line-soft);
+  border-radius: var(--sw-radius-sm);
   cursor: pointer;
 }
 
@@ -632,7 +657,7 @@ td.num {
 
 .library-item.selected {
   border-color: var(--accent);
-  background: var(--navy);
+  background: var(--selected);
 }
 
 .muted {
@@ -680,4 +705,44 @@ hr {
   border: 0;
   border-top: 1px solid var(--line-soft);
   margin: 2px 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Controls on the navy bar                                               */
+/* --------------------------------------------------------------------- */
+
+/* The bare button and input rules above are unlayered, so they beat the
+   theme's bar styles; restate those here. */
+.sw-bar button {
+  background: transparent;
+  color: var(--sw-navy-ink);
+  border-color: var(--sw-navy-line);
+}
+
+.sw-bar button:hover:not(:disabled) {
+  background: var(--sw-navy-tint);
+  border-color: var(--sw-accent-soft);
+}
+
+.sw-bar button:disabled {
+  color: var(--sw-navy-ink);
+  opacity: 0.4;
+}
+
+.sw-bar button.primary,
+.sw-bar button.active {
+  background: var(--sw-accent-soft);
+  border-color: var(--sw-accent-soft);
+  color: var(--sw-navy);
+}
+
+.sw-bar input[type='text'] {
+  background: var(--sw-navy-tint);
+  color: var(--sw-navy-ink);
+  border-color: var(--sw-navy-line);
+}
+
+.sw-bar input:focus,
+.sw-bar button:focus-visible {
+  outline-color: var(--sw-accent-soft);
 }

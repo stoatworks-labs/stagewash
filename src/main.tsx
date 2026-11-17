@@ -2,6 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './ui/App';
+// The shared Stoatworks theme first. Vendored from stoatworks-backend/theme by scripts/sync-theme.sh.
+import './stoatworks-theme.css';
 import './ui/styles.css';
 import { registerServiceWorker } from './register-sw';
 

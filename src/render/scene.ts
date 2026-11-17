@@ -181,7 +181,8 @@ export function createScene(canvas: HTMLCanvasElement, setup: SceneSetup = {}): 
     preserveDrawingBuffer: setup.preserveDrawingBuffer ?? false,
   });
   renderer.setPixelRatio(setup.pixelRatio ?? Math.min(window.devicePixelRatio, 2));
-  renderer.setClearColor(new Color(0x080d13), 1);
+  // The theme's --sw-stage: the viewport stays dark in both modes.
+  renderer.setClearColor(new Color(0x060e16), 1);
 
   const scene = new Scene();
 
